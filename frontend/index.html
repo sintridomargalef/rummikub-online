@@ -14,6 +14,7 @@
         <option value="theme-classic">Clásico</option>
         <option value="theme-cyberpunk">Cyberpunk</option>
         <option value="theme-nature">Naturaleza</option>
+        <option value="theme-desert">Desierto</option>
       </select>
     </div>
   </div>
@@ -35,6 +36,46 @@
           <small>El 1 puede cerrar una escalera tras el 13 (ej. 11-12-13-1). El 1 colocado así NO continúa a 2.</small>
         </span>
       </label>
+      <div class="regla-select">
+        <label for="tiempo-total">Tiempo total de partida</label>
+        <select id="tiempo-total">
+          <option value="0">Sin límite</option>
+          <option value="300">5 min</option>
+          <option value="600">10 min</option>
+          <option value="900">15 min</option>
+          <option value="1800">30 min</option>
+          <option value="3600">60 min</option>
+        </select>
+      </div>
+      <div class="regla-select">
+        <label for="tiempo-turno">Tiempo por jugada</label>
+        <select id="tiempo-turno">
+          <option value="0">Sin límite</option>
+          <option value="15">15 seg</option>
+          <option value="30">30 seg</option>
+          <option value="45">45 seg</option>
+          <option value="60">60 seg</option>
+          <option value="90">90 seg</option>
+          <option value="120">2 min</option>
+        </select>
+      </div>
+      <label class="regla-item extremo-item">
+        <input type="checkbox" id="regla-juego-extremo">
+        <span>
+          🔥 JUEGO EXTREMO
+          <small>El tiempo por jugada se reduce proporcionalmente al tiempo total restante. ¡Cada vez más rápido!</small>
+        </span>
+      </label>
+
+      <div class="separador-reglas"></div>
+
+      <label class="regla-item ia-item">
+        <input type="checkbox" id="regla-contra-ia">
+        <span>
+          🤖 Jugar contra IA
+          <small>Juega contra la máquina. El orden de salida será aleatorio.</small>
+        </span>
+      </label>
       <p class="aviso-reglas">Si te unes a una sala existente, las reglas las decide quien la creó.</p>
     </div>
 
@@ -49,6 +90,11 @@
 
     <p id="msg" class="msg"></p>
   </main>
+  <script>
+    document.getElementById("regla-juego-extremo").addEventListener("change", function() {
+      document.getElementById("tiempo-turno").disabled = this.checked;
+    });
+  </script>
   <script src="/static/js/theme.js"></script>
   <script src="/static/js/lobby.js"></script>
 </body>

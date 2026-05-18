@@ -1,6 +1,6 @@
 // Gestor de temas: lee/guarda el tema en localStorage y mantiene sincronizado el selector.
 (function () {
-  const TEMAS = ["theme-classic", "theme-cyberpunk", "theme-nature"];
+  const TEMAS = ["theme-classic", "theme-cyberpunk", "theme-nature", "theme-desert"];
   const DEFAULT = "theme-classic";
 
   function aplicar(tema) {
@@ -24,6 +24,8 @@
         ? "theme-cyberpunk"
         : document.body.classList.contains("theme-nature")
         ? "theme-nature"
+        : document.body.classList.contains("theme-desert")
+        ? "theme-desert"
         : "theme-classic";
       sel.addEventListener("change", (e) => aplicar(e.target.value));
     }
