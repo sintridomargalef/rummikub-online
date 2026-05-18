@@ -93,27 +93,38 @@ let atrilLocal = [Array(ATRIL_SLOTS_MIN).fill(null), Array(ATRIL_SLOTS_MIN).fill
 let miTurno = false;
 const yo = nombre;
 
+const SLOTS_BUFFER_DERECHA = 2;  // siempre 2 huecos extra a la derecha de la última ficha
+
 function totalSlots() {
   return Math.max(atrilLocal[0].length, atrilLocal[1].length);
 }
 
+function ultimaColumnaConFicha() {
+  let max = -1;
+  for (let f = 0; f < ATRIL_FILAS; f++) {
+    for (let c = atrilLocal[f].length - 1; c >= 0; c--) {
+      if (atrilLocal[f][c]) { if (c > max) max = c; break; }
+    }
+  }
+  return max;
+}
+
+function slotsNecesarios() {
+  return Math.max(ATRIL_SLOTS_MIN, ultimaColumnaConFicha() + 1 + SLOTS_BUFFER_DERECHA);
+}
+
 function asegurarSlots(min) {
-  // garantiza al menos `min` slots en ambas filas, rellenando con null
   for (let f = 0; f < ATRIL_FILAS; f++) {
     while (atrilLocal[f].length < min) atrilLocal[f].push(null);
   }
 }
 
 function compactarTail() {
-  // recorta nulls finales pero deja al menos ATRIL_SLOTS_MIN
-  let largo = totalSlots();
-  while (largo > ATRIL_SLOTS_MIN) {
-    const ultColVacia =
-      atrilLocal[0][largo - 1] == null && atrilLocal[1][largo - 1] == null;
-    if (!ultColVacia) break;
-    atrilLocal[0].pop();
-    atrilLocal[1].pop();
-    largo--;
+  // mantiene siempre N huecos a la derecha de la última ficha, y al menos ATRIL_SLOTS_MIN totales
+  const objetivo = slotsNecesarios();
+  for (let f = 0; f < ATRIL_FILAS; f++) {
+    while (atrilLocal[f].length > objetivo) atrilLocal[f].pop();
+    while (atrilLocal[f].length < objetivo) atrilLocal[f].push(null);
   }
 }
 
@@ -328,8 +339,25 @@ function dropTargetEnPunto(x, y) {
   pdrag.ghost.style.display = "none";
   const el = document.elementFromPoint(x, y);
   pdrag.ghost.style.display = prevDisplay;
-  if (!el) return null;
-  return el.closest("[data-drop-tipo]");
+  if (!el) return slotMasCercano(x, y);
+  const directo = el.closest("[data-drop-tipo]");
+  if (directo) return directo;
+  // Si caímos fuera de cualquier zona de drop, intentamos el slot más cercano.
+  return slotMasCercano(x, y);
+}
+
+function slotMasCercano(x, y) {
+  // Busca el slot del atril cuyo centro esté más cerca del punto, dentro de un radio razonable.
+  let mejor = null;
+  let mejorDist = 80 * 80;  // ~80px de tolerancia
+  document.querySelectorAll('[data-drop-tipo="atril"]').forEach((el) => {
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const d = (cx - x) * (cx - x) + (cy - y) * (cy - y);
+    if (d < mejorDist) { mejorDist = d; mejor = el; }
+  });
+  return mejor;
 }
 
 function limpiarMarcasDrop() {
