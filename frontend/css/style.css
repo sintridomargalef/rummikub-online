@@ -325,6 +325,7 @@ body.game {
 }
 .combinacion {
   display: flex;
+  flex-direction: column;
   gap: 2px;
   background: var(--combinacion-bg);
   padding: 6px;
@@ -335,8 +336,46 @@ body.game {
   position: relative;
   z-index: 1;
 }
+.combinacion .fichas {
+  display: flex;
+  gap: 2px;
+}
+.combo-handle {
+  height: 8px;
+  margin: -2px 0 4px 0;
+  border-radius: 4px;
+  background: rgba(255,255,255,.15);
+  cursor: grab;
+  touch-action: none;
+}
+.combo-handle:hover { background: rgba(255,255,255,.30); }
+.combo-handle:active { cursor: grabbing; }
+.combinacion.combo-dragging { opacity: .35; }
+.combinacion.combo-drop-before { box-shadow: -4px 0 0 var(--texto); }
+.combinacion.combo-drop-after  { box-shadow:  4px 0 0 var(--texto); }
 .combinacion.drop-target { border-color: var(--texto); }
-.combinacion.invalida { background: rgba(180,40,40,.35); }
+.combinacion.invalida {
+  background: rgba(200,40,40,.55) !important;
+  border-color: #ff3030 !important;
+  box-shadow: 0 0 0 2px #ff3030, 0 0 16px rgba(255,40,40,.5);
+}
+.combinacion.invalida::before {
+  content: "✕";
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  background: #ff3030;
+  color: white;
+  font-weight: 900;
+  font-size: 14px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
 .combinacion-nueva {
   background: var(--combinacion-nueva-bg);
   border: 2px dashed var(--combinacion-nueva-borde);
