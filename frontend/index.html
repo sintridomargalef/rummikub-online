@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Rummikub Online</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="lobby theme-classic">
+  <div class="lobby-top">
+    <div class="theme-picker">
+      <span>Tema:</span>
+      <select id="theme-select">
+        <option value="theme-classic">Clásico</option>
+        <option value="theme-cyberpunk">Cyberpunk</option>
+        <option value="theme-nature">Naturaleza</option>
+      </select>
+    </div>
+  </div>
+
+  <main class="lobby-box">
+    <h1>Rummikub Online</h1>
+    <p class="subtitle">Partida 1 vs 1</p>
+
+    <label>Tu nombre
+      <input id="nombre" type="text" maxlength="20" placeholder="Manel" autocomplete="off">
+    </label>
+
+    <div class="reglas-panel">
+      <h3>Reglas opcionales (al crear sala)</h3>
+      <label class="regla-item">
+        <input type="checkbox" id="regla-wrap_13_to_1">
+        <span>
+          Permitir 1 después del 13
+          <small>El 1 puede cerrar una escalera tras el 13 (ej. 11-12-13-1). El 1 colocado así NO continúa a 2.</small>
+        </span>
+      </label>
+      <p class="aviso-reglas">Si te unes a una sala existente, las reglas las decide quien la creó.</p>
+    </div>
+
+    <div class="acciones">
+      <button id="btn-crear">Crear sala</button>
+      <div class="separador">o</div>
+      <div class="unirse">
+        <input id="codigo" type="text" maxlength="4" placeholder="CÓDIGO" autocomplete="off">
+        <button id="btn-unirse">Unirme</button>
+      </div>
+    </div>
+
+    <p id="msg" class="msg"></p>
+  </main>
+  <script src="/static/js/theme.js"></script>
+  <script src="/static/js/lobby.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Rummikub Online · Partida</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="game theme-classic">
+  <header class="topbar">
+    <div class="info">
+      <span id="info-turno">Conectando…</span>
+      <span id="info-rival"></span>
+      <span id="info-mazo"></span>
+      <span id="info-reglas" class="reglas-chip hidden"></span>
+    </div>
+    <div class="acciones">
+      <button id="btn-fin-turno">Terminar turno</button>
+      <button id="btn-robar">Robar y pasar</button>
+      <button id="btn-deshacer" title="Deshacer movimientos de este turno">Deshacer</button>
+      <button id="btn-ordenar" title="Ordenar atril">Ordenar</button>
+      <button id="btn-ayuda" title="Agrupar por colores, de menor a mayor">Ayuda</button>
+      <div class="theme-picker">
+        <select id="theme-select">
+          <option value="theme-classic">Clásico</option>
+          <option value="theme-cyberpunk">Cyberpunk</option>
+          <option value="theme-nature">Naturaleza</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <section id="mesa" class="mesa" aria-label="Mesa de juego"></section>
+
+  <footer class="atril-wrapper">
+    <div id="atril-0" class="atril" data-fila="0" aria-label="Tu atril, fila superior"></div>
+    <div id="atril-1" class="atril" data-fila="1" aria-label="Tu atril, fila inferior"></div>
+  </footer>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="espera" class="overlay hidden">
+    <div class="overlay-box espera-box">
+      <h2>Esperando rival…</h2>
+      <p>Comparte este código para que se una a tu sala:</p>
+      <div class="codigo-grande" id="codigo-grande">----</div>
+      <div class="botones-compartir">
+        <button id="btn-copiar-codigo">Copiar código</button>
+        <button id="btn-copiar-enlace">Copiar enlace</button>
+      </div>
+      <p class="enlace-preview" id="enlace-preview"></p>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay hidden">
+    <div class="overlay-box">
+      <h2 id="overlay-titulo"></h2>
+      <p id="overlay-msg"></p>
+      <button id="overlay-cerrar">Cerrar</button>
+    </div>
+  </div>
+
+  <script src="/static/js/theme.js"></script>
+  <script src="/static/js/ws.js"></script>
+  <script src="/static/js/game.js"></script>
+</body>
+</html>
