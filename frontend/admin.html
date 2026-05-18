@@ -266,9 +266,10 @@
 
     $("btn-refresh").addEventListener("click", refrescar);
 
-    // URLs visibles
-    $("url-lan").textContent = `http://${location.hostname === "localhost" ? "192.168.1.40" : location.hostname}`;
-    $("url-publica").textContent = `http://${location.host}`;
+    // URLs visibles: el juego corre en :80 (sin puerto), el admin en :8080
+    const hostJuego = location.hostname === "localhost" ? "192.168.1.40" : location.hostname;
+    $("url-lan").textContent = `http://${hostJuego}`;
+    $("url-publica").textContent = `http://<tu-IP-pública>`;
 
     // Auto-refresco
     let timer = null;

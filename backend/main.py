@@ -4,13 +4,11 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import secrets
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
 from .game.state import GameState
@@ -22,23 +20,9 @@ ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
 
 INICIO_SERVER = time.time()
-ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "rummikub2026")
 
 app = FastAPI(title="Rummikub Online")
-security = HTTPBasic()
-
-
-def comprobar_admin(creds: HTTPBasicCredentials = Depends(security)) -> str:
-    ok_user = secrets.compare_digest(creds.username, ADMIN_USER)
-    ok_pass = secrets.compare_digest(creds.password, ADMIN_PASSWORD)
-    if not (ok_user and ok_pass):
-        raise HTTPException(
-            status_code=401,
-            detail="Credenciales inválidas",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return creds.username
+admin_app = FastAPI(title="Rummikub Admin")
 
 
 @app.post("/api/sala")
@@ -210,8 +194,8 @@ def _resumen_sala(sala) -> dict:
     }
 
 
-@app.get("/api/admin/state")
-async def admin_state(_user: str = Depends(comprobar_admin)):
+@admin_app.get("/api/admin/state")
+async def admin_state():
     salas = [_resumen_sala(s) for s in gestor.salas.values()]
     salas.sort(key=lambda s: s["ultima_accion"], reverse=True)
     return {
@@ -223,12 +207,11 @@ async def admin_state(_user: str = Depends(comprobar_admin)):
     }
 
 
-@app.post("/api/admin/cerrar/{codigo}")
-async def admin_cerrar(codigo: str, _user: str = Depends(comprobar_admin)):
+@admin_app.post("/api/admin/cerrar/{codigo}")
+async def admin_cerrar(codigo: str):
     sala = gestor.obtener(codigo)
     if not sala:
         raise HTTPException(404, "Sala no encontrada")
-    # cerrar todos los sockets primero
     for ws in list(sala.sockets.values()):
         try:
             await ws.close(code=1001)
@@ -238,8 +221,8 @@ async def admin_cerrar(codigo: str, _user: str = Depends(comprobar_admin)):
     return {"ok": True, "codigo": codigo}
 
 
-@app.post("/api/admin/cerrar-todas")
-async def admin_cerrar_todas(_user: str = Depends(comprobar_admin)):
+@admin_app.post("/api/admin/cerrar-todas")
+async def admin_cerrar_todas():
     codigos = list(gestor.salas.keys())
     for cod in codigos:
         sala = gestor.salas[cod]
@@ -252,9 +235,14 @@ async def admin_cerrar_todas(_user: str = Depends(comprobar_admin)):
     return {"ok": True, "cerradas": len(codigos)}
 
 
-@app.get("/admin")
-async def admin_page(_user: str = Depends(comprobar_admin)):
+@admin_app.get("/")
+async def admin_root():
     return FileResponse(str(FRONTEND / "admin.html"))
+
+
+# Estáticos para el admin (CSS compartido con el frontend principal)
+if FRONTEND.exists():
+    admin_app.mount("/static", StaticFiles(directory=str(FRONTEND)), name="static")
 
 
 # Frontend estático
