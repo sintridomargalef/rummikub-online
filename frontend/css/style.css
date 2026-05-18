@@ -314,6 +314,7 @@ body.game {
   align-content: flex-start;
   gap: 12px;
   position: relative;
+  touch-action: pan-y;  /* permite scroll vertical, pero deja que el drag de fichas mande */
 }
 .mesa::before {
   content: "";
@@ -386,7 +387,12 @@ body.game {
   font-family: var(--titulo-font);
 }
 .ficha:active { cursor: grabbing; }
-.ficha.dragging { opacity: .4; }
+.ficha.dragging { opacity: .3; }
+.ficha.ghost {
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0,0,0,.5);
+  transform: scale(1.05);
+}
 .ficha.negro { color: var(--negro); }
 .ficha.azul { color: var(--azul); text-shadow: var(--texto-shadow); }
 .ficha.rojo { color: var(--rojo); text-shadow: var(--texto-shadow); }
@@ -438,6 +444,30 @@ body.theme-cyberpunk .ficha {
   border: 1px solid var(--acento);
 }
 .overlay-box h2 { margin-top: 0; color: var(--acento); }
+
+/* ===== Responsive (móvil) ===== */
+@media (max-width: 700px) {
+  .ficha {
+    width: 52px;
+    height: 70px;
+    font-size: 28px;
+  }
+  .ficha.joker::after { font-size: 38px; }
+  .combinacion {
+    min-height: 84px;
+    min-width: 70px;
+    padding: 4px;
+  }
+  .atril { min-height: 80px; padding: 4px; gap: 3px; }
+  .topbar { padding: 6px 8px; font-size: 12px; }
+  .topbar .info { gap: 6px; font-size: 11px; }
+  .topbar .info span { padding: 2px 6px; }
+  .topbar .acciones { gap: 4px; }
+  .topbar button { padding: 6px 8px; font-size: 12px; }
+  .codigo-grande { font-size: 48px; letter-spacing: 8px; }
+  .lobby-box { width: 92vw; padding: 20px; }
+  .lobby-top { width: 92vw; }
+}
 
 .espera-box { max-width: 480px; }
 .codigo-grande {

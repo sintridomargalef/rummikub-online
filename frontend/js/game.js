@@ -101,13 +101,7 @@ function renderFicha(tile, dragHabilitado) {
     div.classList.add(tile.color);
     div.textContent = tile.number;
   }
-  div.draggable = dragHabilitado;
-  div.addEventListener("dragstart", (e) => {
-    e.dataTransfer.setData("text/plain", tile.id);
-    e.dataTransfer.effectAllowed = "move";
-    div.classList.add("dragging");
-  });
-  div.addEventListener("dragend", () => div.classList.remove("dragging"));
+  if (dragHabilitado) attachPointerDrag(div, tile);
   return div;
 }
 
@@ -218,49 +212,132 @@ function posicionInsercion(contenedor, clientX) {
 }
 
 function habilitarDropEnCombinacion(el, idx) {
-  el.addEventListener("dragover", (e) => {
-    if (!miTurno) return;
+  el.dataset.dropTipo = "combinacion";
+  el.dataset.dropIdx = String(idx);
+}
+
+// Marcamos las dos filas del atril como zonas de drop.
+atrilEls.forEach((el, fila) => {
+  el.dataset.dropTipo = "atril";
+  el.dataset.dropIdx = String(fila);
+});
+
+// ============ Pointer drag (funciona en ratón y táctil) ============
+let pdrag = null;     // { tile, srcEl, ghost, pointerId, fromX }
+
+function attachPointerDrag(fichaEl, tile) {
+  fichaEl.style.touchAction = "none";
+  fichaEl.addEventListener("pointerdown", (e) => {
+    if (e.button !== undefined && e.button !== 0) return;  // solo botón principal
     e.preventDefault();
-    el.classList.add("drop-target");
-  });
-  el.addEventListener("dragleave", () => el.classList.remove("drop-target"));
-  el.addEventListener("drop", (e) => {
-    e.preventDefault();
-    el.classList.remove("drop-target");
-    if (!miTurno) return;
-    const tileId = e.dataTransfer.getData("text/plain");
-    const tile = quitarFicha(tileId);
-    if (!tile) return;
-    if (idx === "nueva") {
-      mesaLocal.push([tile]);
-    } else {
-      const pos = posicionInsercion(el, e.clientX);
-      mesaLocal[idx].splice(pos, 0, tile);
-    }
-    limpiarCombinacionesVacias();
-    render();
+    iniciarDrag(e, fichaEl, tile);
   });
 }
 
-// Drop en cualquiera de las dos filas del atril (siempre permitido).
-atrilEls.forEach((el, fila) => {
-  el.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    el.classList.add("drop-target");
-  });
-  el.addEventListener("dragleave", () => el.classList.remove("drop-target"));
-  el.addEventListener("drop", (e) => {
-    e.preventDefault();
-    el.classList.remove("drop-target");
-    const tileId = e.dataTransfer.getData("text/plain");
-    const tile = quitarFicha(tileId);
-    if (!tile) return;
-    const pos = posicionInsercion(el, e.clientX);
-    atrilLocal[fila].splice(pos, 0, tile);
+function iniciarDrag(e, srcEl, tile) {
+  const rect = srcEl.getBoundingClientRect();
+  const ghost = srcEl.cloneNode(true);
+  ghost.classList.add("ghost");
+  ghost.style.position = "fixed";
+  ghost.style.left = rect.left + "px";
+  ghost.style.top = rect.top + "px";
+  ghost.style.width = rect.width + "px";
+  ghost.style.height = rect.height + "px";
+  ghost.style.pointerEvents = "none";
+  ghost.style.zIndex = "1000";
+  ghost.style.opacity = "0.85";
+  document.body.appendChild(ghost);
+  srcEl.classList.add("dragging");
+
+  pdrag = {
+    tile,
+    srcEl,
+    ghost,
+    pointerId: e.pointerId,
+    offsetX: e.clientX - rect.left,
+    offsetY: e.clientY - rect.top,
+  };
+  // captura: aunque salgamos del elemento, seguimos recibiendo eventos
+  try { srcEl.setPointerCapture(e.pointerId); } catch (_) {}
+  posicionarGhost(e.clientX, e.clientY);
+  marcarDropTargetSegunPunto(e.clientX, e.clientY);
+}
+
+function posicionarGhost(x, y) {
+  if (!pdrag) return;
+  pdrag.ghost.style.left = (x - pdrag.offsetX) + "px";
+  pdrag.ghost.style.top = (y - pdrag.offsetY) + "px";
+}
+
+function dropTargetEnPunto(x, y) {
+  if (!pdrag) return null;
+  const prevDisplay = pdrag.ghost.style.display;
+  pdrag.ghost.style.display = "none";
+  const el = document.elementFromPoint(x, y);
+  pdrag.ghost.style.display = prevDisplay;
+  if (!el) return null;
+  return el.closest("[data-drop-tipo]");
+}
+
+function limpiarMarcasDrop() {
+  document.querySelectorAll(".drop-target").forEach((el) => el.classList.remove("drop-target"));
+}
+
+function marcarDropTargetSegunPunto(x, y) {
+  limpiarMarcasDrop();
+  const target = dropTargetEnPunto(x, y);
+  if (target) target.classList.add("drop-target");
+}
+
+document.addEventListener("pointermove", (e) => {
+  if (!pdrag || e.pointerId !== pdrag.pointerId) return;
+  posicionarGhost(e.clientX, e.clientY);
+  marcarDropTargetSegunPunto(e.clientX, e.clientY);
+});
+
+document.addEventListener("pointerup", (e) => {
+  if (!pdrag || e.pointerId !== pdrag.pointerId) return;
+  const target = dropTargetEnPunto(e.clientX, e.clientY);
+  finalizarDrag(target, e.clientX);
+});
+
+document.addEventListener("pointercancel", () => {
+  finalizarDrag(null, 0);
+});
+
+function finalizarDrag(target, clientX) {
+  if (!pdrag) return;
+  const { tile, srcEl, ghost } = pdrag;
+  ghost.remove();
+  srcEl.classList.remove("dragging");
+  limpiarMarcasDrop();
+  pdrag = null;
+
+  if (!target) return;
+  const tipo = target.dataset.dropTipo;
+  const idx = target.dataset.dropIdx;
+
+  if (tipo === "combinacion") {
+    if (!miTurno) return;
+    const t = quitarFicha(tile.id);
+    if (!t) return;
+    if (idx === "nueva") {
+      mesaLocal.push([t]);
+    } else {
+      const pos = posicionInsercion(target, clientX);
+      mesaLocal[parseInt(idx, 10)].splice(pos, 0, t);
+    }
     limpiarCombinacionesVacias();
     render();
-  });
-});
+  } else if (tipo === "atril") {
+    const t = quitarFicha(tile.id);
+    if (!t) return;
+    const pos = posicionInsercion(target, clientX);
+    atrilLocal[parseInt(idx, 10)].splice(pos, 0, t);
+    limpiarCombinacionesVacias();
+    render();
+  }
+}
 
 // ============ Reconciliación con snapshot del servidor ============
 function reconciliarAtril(serverTiles) {
