@@ -353,19 +353,33 @@ body.game {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  overflow-x: auto;
 }
 .atril {
   background: var(--atril);
   border-radius: 8px;
   padding: 8px;
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 72px;
+  grid-template-rows: 98px;
   gap: 4px;
-  flex-wrap: wrap;
-  min-height: 110px;
+  min-height: 116px;
   box-shadow: inset 0 2px 4px rgba(0,0,0,.3);
   border: 2px dashed transparent;
 }
 .atril.drop-target { border-color: var(--texto); }
+.slot {
+  width: 72px;
+  height: 98px;
+  border-radius: 5px;
+  background: rgba(0,0,0,.06);
+  border: 1px dashed rgba(0,0,0,.18);
+}
+.slot.drop-target {
+  background: rgba(255,255,255,.15);
+  border-color: var(--texto);
+}
 
 /* ===== Ficha ===== */
 .ficha {
@@ -458,7 +472,14 @@ body.theme-cyberpunk .ficha {
     min-width: 70px;
     padding: 4px;
   }
-  .atril { min-height: 80px; padding: 4px; gap: 3px; }
+  .atril {
+    grid-auto-columns: 52px;
+    grid-template-rows: 70px;
+    min-height: 84px;
+    padding: 4px;
+    gap: 3px;
+  }
+  .slot { width: 52px; height: 70px; }
   .topbar { padding: 6px 8px; font-size: 12px; }
   .topbar .info { gap: 6px; font-size: 11px; }
   .topbar .info span { padding: 2px 6px; }

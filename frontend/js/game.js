@@ -84,11 +84,38 @@ function combinacionValida(fichas, reglas) {
 
 // Snapshot canónico recibido del servidor (referencia para "deshacer").
 let snapshotServidor = null;
-// Estado local mutable: mesa y atril (atril = [filaSup[], filaInf[]]).
+// Estado local mutable: mesa y atril.
+// Atril es ahora una rejilla 2 filas × SLOTS columnas. Cada celda contiene un tile o null.
+const ATRIL_FILAS = 2;
+const ATRIL_SLOTS_MIN = 16;       // arranca con 16, crece automáticamente si hace falta
 let mesaLocal = [];
-let atrilLocal = [[], []];
+let atrilLocal = [Array(ATRIL_SLOTS_MIN).fill(null), Array(ATRIL_SLOTS_MIN).fill(null)];
 let miTurno = false;
 const yo = nombre;
+
+function totalSlots() {
+  return Math.max(atrilLocal[0].length, atrilLocal[1].length);
+}
+
+function asegurarSlots(min) {
+  // garantiza al menos `min` slots en ambas filas, rellenando con null
+  for (let f = 0; f < ATRIL_FILAS; f++) {
+    while (atrilLocal[f].length < min) atrilLocal[f].push(null);
+  }
+}
+
+function compactarTail() {
+  // recorta nulls finales pero deja al menos ATRIL_SLOTS_MIN
+  let largo = totalSlots();
+  while (largo > ATRIL_SLOTS_MIN) {
+    const ultColVacia =
+      atrilLocal[0][largo - 1] == null && atrilLocal[1][largo - 1] == null;
+    if (!ultColVacia) break;
+    atrilLocal[0].pop();
+    atrilLocal[1].pop();
+    largo--;
+  }
+}
 
 // ============ Render ============
 function renderFicha(tile, dragHabilitado) {
@@ -126,10 +153,23 @@ function render() {
   habilitarDropEnCombinacion(nueva, "nueva");
   mesaEl.appendChild(nueva);
 
-  // Atril: las fichas del atril siempre son arrastrables (para reordenar).
+  // Atril: rejilla con slots fijos. Cada celda es una zona de drop independiente.
+  asegurarSlots(ATRIL_SLOTS_MIN);
+  const slots = totalSlots();
   atrilEls.forEach((el, fila) => {
     el.innerHTML = "";
-    atrilLocal[fila].forEach((t) => el.appendChild(renderFicha(t, true)));
+    for (let col = 0; col < slots; col++) {
+      const tile = atrilLocal[fila][col];
+      const slotEl = document.createElement("div");
+      slotEl.className = tile ? "" : "slot";
+      slotEl.dataset.dropTipo = "atril";
+      slotEl.dataset.dropFila = String(fila);
+      slotEl.dataset.dropCol = String(col);
+      if (tile) {
+        slotEl.appendChild(renderFicha(tile, true));
+      }
+      el.appendChild(slotEl);
+    }
   });
 
   // estado top
@@ -169,16 +209,20 @@ function render() {
   $("btn-deshacer").disabled = !miTurno || !jugadaEnCurso;
 }
 
+function fichasEnAtril() {
+  const res = [];
+  for (const fila of atrilLocal) for (const t of fila) if (t) res.push(t);
+  return res;
+}
+
 function hayCambiosRespectoServidor() {
   if (!snapshotServidor) return false;
-  // 1) ¿se ha movido alguna ficha entre atril y mesa? Comparamos conjuntos.
-  const atrilIds = [...atrilLocal[0], ...atrilLocal[1]].map((t) => t.id).sort();
+  const atrilIds = fichasEnAtril().map((t) => t.id).sort();
   const snapAtril = snapshotServidor.tu_atril.map((t) => t.id).sort();
   if (atrilIds.length !== snapAtril.length) return true;
   for (let i = 0; i < atrilIds.length; i++) {
     if (atrilIds[i] !== snapAtril[i]) return true;
   }
-  // 2) ¿se ha reorganizado la mesa? Comparación estructural por ids.
   const mesaActual = JSON.stringify(mesaLocal.map((c) => c.map((t) => t.id)));
   const mesaSnap = JSON.stringify(snapshotServidor.mesa.map((c) => c.map((t) => t.id)));
   return mesaActual !== mesaSnap;
@@ -186,16 +230,31 @@ function hayCambiosRespectoServidor() {
 
 // ============ Drag & drop ============
 function quitarFicha(tileId) {
-  // busca en filas del atril y en mesa, devuelve tile
-  for (const fila of atrilLocal) {
-    const i = fila.findIndex((t) => t.id === tileId);
-    if (i >= 0) return fila.splice(i, 1)[0];
+  // busca en slots del atril (no compacta) y en combinaciones de la mesa (compacta).
+  for (let f = 0; f < atrilLocal.length; f++) {
+    const col = atrilLocal[f].findIndex((t) => t && t.id === tileId);
+    if (col >= 0) {
+      const t = atrilLocal[f][col];
+      atrilLocal[f][col] = null;
+      return t;
+    }
   }
   for (const comb of mesaLocal) {
     const i = comb.findIndex((t) => t.id === tileId);
     if (i >= 0) return comb.splice(i, 1)[0];
   }
   return null;
+}
+
+function primerSlotLibre() {
+  asegurarSlots(ATRIL_SLOTS_MIN);
+  for (let f = 0; f < ATRIL_FILAS; f++) {
+    const col = atrilLocal[f].findIndex((x) => x == null);
+    if (col >= 0) return { fila: f, col };
+  }
+  // ninguna libre → ampliar
+  for (let f = 0; f < ATRIL_FILAS; f++) atrilLocal[f].push(null);
+  return { fila: 0, col: atrilLocal[0].length - 1 };
 }
 
 function limpiarCombinacionesVacias() {
@@ -215,12 +274,6 @@ function habilitarDropEnCombinacion(el, idx) {
   el.dataset.dropTipo = "combinacion";
   el.dataset.dropIdx = String(idx);
 }
-
-// Marcamos las dos filas del atril como zonas de drop.
-atrilEls.forEach((el, fila) => {
-  el.dataset.dropTipo = "atril";
-  el.dataset.dropIdx = String(fila);
-});
 
 // ============ Pointer drag (funciona en ratón y táctil) ============
 let pdrag = null;     // { tile, srcEl, ghost, pointerId, fromX }
@@ -315,10 +368,10 @@ function finalizarDrag(target, clientX) {
 
   if (!target) return;
   const tipo = target.dataset.dropTipo;
-  const idx = target.dataset.dropIdx;
 
   if (tipo === "combinacion") {
     if (!miTurno) return;
+    const idx = target.dataset.dropIdx;
     const t = quitarFicha(tile.id);
     if (!t) return;
     if (idx === "nueva") {
@@ -328,41 +381,89 @@ function finalizarDrag(target, clientX) {
       mesaLocal[parseInt(idx, 10)].splice(pos, 0, t);
     }
     limpiarCombinacionesVacias();
+    compactarTail();
     render();
   } else if (tipo === "atril") {
-    const t = quitarFicha(tile.id);
-    if (!t) return;
-    const pos = posicionInsercion(target, clientX);
-    atrilLocal[parseInt(idx, 10)].splice(pos, 0, t);
+    const fila = parseInt(target.dataset.dropFila, 10);
+    const col = parseInt(target.dataset.dropCol, 10);
+    // Si el slot destino ya contiene esta misma ficha, no hacer nada
+    if (atrilLocal[fila][col] && atrilLocal[fila][col].id === tile.id) return;
+    // Buscar y quitar la ficha de su origen
+    let origen = null;
+    for (let f = 0; f < atrilLocal.length; f++) {
+      const c = atrilLocal[f].findIndex((x) => x && x.id === tile.id);
+      if (c >= 0) { origen = { f, c }; atrilLocal[f][c] = null; break; }
+    }
+    let t = null;
+    if (origen) {
+      t = tile;
+    } else {
+      // venía de la mesa
+      t = quitarFicha(tile.id);
+      if (!t) return;
+    }
+    // Si el slot destino está ocupado, swap (la ficha que estaba va al origen
+    // si lo hubo, si no, al primer slot libre)
+    if (atrilLocal[fila][col]) {
+      const desplazada = atrilLocal[fila][col];
+      atrilLocal[fila][col] = t;
+      if (origen) {
+        atrilLocal[origen.f][origen.c] = desplazada;
+      } else {
+        const libre = primerSlotLibre();
+        atrilLocal[libre.fila][libre.col] = desplazada;
+      }
+    } else {
+      atrilLocal[fila][col] = t;
+    }
     limpiarCombinacionesVacias();
+    compactarTail();
     render();
   }
 }
 
 // ============ Reconciliación con snapshot del servidor ============
 function reconciliarAtril(serverTiles) {
-  // serverTiles: array de tile objects (los oficiales según el servidor).
+  // Preserva posiciones de los slots:
+  //  - Quita del atril las fichas que ya no están en el servidor (deja null).
+  //  - Para cada ficha nueva del servidor, la coloca en el primer slot libre.
   const idsServidor = new Set(serverTiles.map((t) => t.id));
-  // 1) quitar de las filas locales las fichas que ya no están en el servidor.
-  for (let f = 0; f < atrilLocal.length; f++) {
-    atrilLocal[f] = atrilLocal[f].filter((t) => idsServidor.has(t.id));
-  }
-  // 2) añadir al final de la fila 1 las fichas nuevas del servidor que no estén ya en local.
   const idsLocales = new Set();
-  for (const fila of atrilLocal) for (const t of fila) idsLocales.add(t.id);
-  for (const t of serverTiles) {
-    if (!idsLocales.has(t.id)) atrilLocal[1].push({ ...t });
+  for (let f = 0; f < atrilLocal.length; f++) {
+    for (let c = 0; c < atrilLocal[f].length; c++) {
+      const t = atrilLocal[f][c];
+      if (t) {
+        if (idsServidor.has(t.id)) idsLocales.add(t.id);
+        else atrilLocal[f][c] = null;
+      }
+    }
   }
+  for (const t of serverTiles) {
+    if (!idsLocales.has(t.id)) {
+      const libre = primerSlotLibre();
+      atrilLocal[libre.fila][libre.col] = { ...t };
+    }
+  }
+  compactarTail();
+}
+
+function atrilEstaVacio() {
+  for (const fila of atrilLocal)
+    for (const t of fila)
+      if (t) return false;
+  return true;
 }
 
 function aplicarSnapshot(snap) {
   snapshotServidor = snap;
   mesaLocal = snap.mesa.map((comb) => comb.map((t) => ({ ...t })));
-  // Si es la primera vez (atril vacío), distribuye en la fila superior por defecto.
-  const totalLocal = atrilLocal[0].length + atrilLocal[1].length;
-  if (totalLocal === 0) {
-    atrilLocal[0] = snap.tu_atril.map((t) => ({ ...t }));
-    atrilLocal[1] = [];
+  if (atrilEstaVacio()) {
+    // Primera vez: reparto las 14 fichas en la fila superior (slots 0..13)
+    atrilLocal = [Array(ATRIL_SLOTS_MIN).fill(null), Array(ATRIL_SLOTS_MIN).fill(null)];
+    snap.tu_atril.forEach((t, i) => {
+      if (i < ATRIL_SLOTS_MIN) atrilLocal[0][i] = { ...t };
+      else atrilLocal[1][i - ATRIL_SLOTS_MIN] = { ...t };
+    });
   } else {
     reconciliarAtril(snap.tu_atril);
   }
@@ -374,7 +475,7 @@ function aplicarSnapshot(snap) {
 // ============ Acciones ============
 $("btn-fin-turno").addEventListener("click", () => {
   const mesa = mesaLocal.map((c) => c.map((t) => t.id));
-  const atril = [...atrilLocal[0], ...atrilLocal[1]].map((t) => t.id);
+  const atril = fichasEnAtril().map((t) => t.id);
   sock.enviar({ type: "proponer_jugada", mesa, atril });
 });
 
@@ -384,19 +485,30 @@ $("btn-robar").addEventListener("click", () => {
 
 $("btn-deshacer").addEventListener("click", () => {
   if (snapshotServidor) {
-    // Restaura mesa canónica; el atril local se recompone con reconciliación
-    // partiendo del estado "vacío" para forzar volcado limpio.
+    // Restaura mesa canónica; el atril mantiene los slots, solo limpia las fichas
+    // que ya no debe tener (las que dejé en la mesa) y recibe las del servidor.
     mesaLocal = snapshotServidor.mesa.map((comb) => comb.map((t) => ({ ...t })));
-    // Quitar de atrilLocal cualquier ficha que ahora esté en la mesa (se quedaba ahí
-    // tras un drag) y traer todas las del servidor.
     const idsMesa = new Set(mesaLocal.flat().map((t) => t.id));
     for (let f = 0; f < atrilLocal.length; f++) {
-      atrilLocal[f] = atrilLocal[f].filter((t) => !idsMesa.has(t.id));
+      for (let c = 0; c < atrilLocal[f].length; c++) {
+        if (atrilLocal[f][c] && idsMesa.has(atrilLocal[f][c].id)) {
+          atrilLocal[f][c] = null;
+        }
+      }
     }
     reconciliarAtril(snapshotServidor.tu_atril);
     render();
   }
 });
+
+function colocarPorFilas(fila0Tiles, fila1Tiles) {
+  // Coloca dos arrays de tiles en las dos filas, slot 0..N, resto null.
+  const ancho = Math.max(fila0Tiles.length, fila1Tiles.length, ATRIL_SLOTS_MIN);
+  atrilLocal = [Array(ancho).fill(null), Array(ancho).fill(null)];
+  fila0Tiles.forEach((t, i) => { atrilLocal[0][i] = t; });
+  fila1Tiles.forEach((t, i) => { atrilLocal[1][i] = t; });
+  compactarTail();
+}
 
 $("btn-ordenar").addEventListener("click", () => {
   const cmp = (a, b) => {
@@ -405,18 +517,15 @@ $("btn-ordenar").addEventListener("click", () => {
     if (a.color !== b.color) return a.color.localeCompare(b.color);
     return a.number - b.number;
   };
-  // Junta, ordena y reparte: mitad en cada fila para que quepa.
-  const todas = [...atrilLocal[0], ...atrilLocal[1]].sort(cmp);
+  const todas = fichasEnAtril().sort(cmp);
   const mitad = Math.ceil(todas.length / 2);
-  atrilLocal[0] = todas.slice(0, mitad);
-  atrilLocal[1] = todas.slice(mitad);
+  colocarPorFilas(todas.slice(0, mitad), todas.slice(mitad));
   render();
 });
 
 $("btn-ayuda").addEventListener("click", () => {
-  // Agrupa por colores en orden fijo y ordena de menor a mayor; jokers al final.
   const ORDEN_COLORES = ["rojo", "azul", "negro", "amarillo"];
-  const todas = [...atrilLocal[0], ...atrilLocal[1]];
+  const todas = fichasEnAtril();
   const grupos = ORDEN_COLORES.map((color) =>
     todas
       .filter((t) => !t.is_joker && t.color === color)
@@ -424,24 +533,15 @@ $("btn-ayuda").addEventListener("click", () => {
   );
   const jokers = todas.filter((t) => t.is_joker);
   const bloques = [...grupos, jokers].filter((g) => g.length > 0);
-
-  // Reparte en 2 filas cortando entre bloques (sin partir un color) lo más
-  // equilibrado posible.
   const total = bloques.reduce((acc, g) => acc + g.length, 0);
   const objetivo = total / 2;
-  let acumulado = 0;
-  let mejorCorte = 0;
-  let mejorDiff = Infinity;
+  let acumulado = 0, mejorCorte = 0, mejorDiff = Infinity;
   for (let i = 0; i <= bloques.length; i++) {
     const diff = Math.abs(acumulado - objetivo);
-    if (diff < mejorDiff) {
-      mejorDiff = diff;
-      mejorCorte = i;
-    }
+    if (diff < mejorDiff) { mejorDiff = diff; mejorCorte = i; }
     if (i < bloques.length) acumulado += bloques[i].length;
   }
-  atrilLocal[0] = bloques.slice(0, mejorCorte).flat();
-  atrilLocal[1] = bloques.slice(mejorCorte).flat();
+  colocarPorFilas(bloques.slice(0, mejorCorte).flat(), bloques.slice(mejorCorte).flat());
   render();
 });
 
