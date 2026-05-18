@@ -23,6 +23,7 @@
       <button id="btn-ordenar" title="Ordenar atril">Ordenar</button>
       <button id="btn-ayuda" title="Agrupar por colores, de menor a mayor">Ayuda</button>
       <button id="btn-sonido" title="Activar/desactivar sonido">🔊</button>
+      <button id="btn-voz" title="Activar/desactivar voz">🗣</button>
       <div class="theme-picker">
         <select id="theme-select">
           <option value="theme-classic">Clásico</option>
@@ -32,6 +33,12 @@
       </div>
     </div>
   </header>
+
+  <div id="banner-turno" class="banner-turno hidden">
+    <span class="banner-label">TURNO DE</span>
+    <span id="banner-nombre" class="banner-nombre">—</span>
+    <span id="banner-cronotur" class="banner-cronotur"></span>
+  </div>
 
   <section id="mesa" class="mesa" aria-label="Mesa de juego"></section>
 

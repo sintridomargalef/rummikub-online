@@ -18,28 +18,56 @@ const infoTiempo = $("info-tiempo");
 const toast = $("toast");
 const overlay = $("overlay");
 
-// ====== Sonido ======
+// ====== Sonido y voz ======
 let sonidoActivo = (() => {
   try { return localStorage.getItem("rk_sonido") !== "off"; } catch (_) { return true; }
 })();
+let vozActiva = (() => {
+  try { return localStorage.getItem("rk_voz") === "on"; } catch (_) { return false; }
+})();
 let audioCtx = null;
-function clicSonido() {
+function _audio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function _tono(freq, dur = 0.05, vol = 0.10, type = "square") {
   if (!sonidoActivo) return;
   try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.frequency.value = 800;
-    o.type = "square";
-    g.gain.setValueAtTime(0.10, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(); o.stop(audioCtx.currentTime + 0.05);
+    const ctx = _audio();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.frequency.value = freq;
+    o.type = type;
+    g.gain.setValueAtTime(vol, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime + dur);
   } catch (_) {}
 }
+function clicSonido()       { _tono(800, 0.05, 0.10, "square"); }
+function sonidoTuTurno()    { _tono(523, 0.12, 0.18, "sine"); setTimeout(() => _tono(784, 0.20, 0.18, "sine"), 130); }
+function sonidoError()      { _tono(220, 0.18, 0.20, "sawtooth"); setTimeout(() => _tono(180, 0.18, 0.20, "sawtooth"), 100); }
+function sonidoVictoria()   { _tono(523, 0.15, 0.20, "sine"); setTimeout(() => _tono(659, 0.15, 0.20, "sine"), 160); setTimeout(() => _tono(784, 0.30, 0.20, "sine"), 320); }
+function sonidoTiempoAviso(){ _tono(440, 0.40, 0.15, "triangle"); }
+
+function decir(texto) {
+  if (!vozActiva) return;
+  if (!("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = "es-ES";
+    u.rate = 1.05;
+    u.volume = 0.9;
+    window.speechSynthesis.speak(u);
+  } catch (_) {}
+}
+
 function actualizarBotonSonido() {
   const btn = $("btn-sonido");
   if (btn) btn.textContent = sonidoActivo ? "🔊" : "🔇";
+  const btnV = $("btn-voz");
+  if (btnV) btnV.textContent = vozActiva ? "🗣" : "💬";
 }
 
 // ====== Validador local de combinaciones (espejo del backend) ======
@@ -551,6 +579,32 @@ function finalizarDrag(target, clientX) {
     if (!miTurno) return;
     guardarParaDeshacer();
     const idx = target.dataset.dropIdx;
+    // Caso especial: partir escalera si la ficha duplica un número ya presente
+    if (idx !== "nueva" && !tile.is_joker) {
+      const idxNum = parseInt(idx, 10);
+      const comb = mesaLocal[idxNum];
+      const reales = comb.filter((t) => !t.is_joker);
+      const mismoColor = reales.length > 0 && reales.every((t) => t.color === tile.color);
+      const tieneEseNumero = reales.some((t) => t.number === tile.number);
+      if (mismoColor && tieneEseNumero && comb.length >= 5) {
+        // Es una escalera del mismo color que ya contiene ese número →
+        // intentar partir en dos sub-escaleras.
+        const partida = intentarPartirEscalera(comb, tile);
+        if (partida) {
+          // quitar la ficha del atril
+          quitarFicha(tile.id);
+          mesaLocal.splice(idxNum, 1, partida[0], partida[1]);
+          autoOrdenarSiEsEscalera(idxNum);
+          autoOrdenarSiEsEscalera(idxNum + 1);
+          limpiarCombinacionesVacias();
+          compactarTail();
+          clicSonido();
+          render();
+          mostrarToast("Escalera partida en dos", "ok");
+          return;
+        }
+      }
+    }
     // Caso especial: swap de joker
     if (idx !== "nueva") {
       const idxNum = parseInt(idx, 10);
@@ -675,6 +729,59 @@ function puedeSustituirJoker(comb, posJoker, fichaReal) {
   return combinacionValida(copia, reglasActivas);
 }
 
+// Partir una escalera existente en 2 sub-escaleras usando la ficha duplicada.
+// Ej.: comb = [5-6-7-8-9-10] negro, tile = 8 negro → [5-6-7-8] + [8-9-10].
+// Devuelve [escA, escB] si la partición resulta en dos escaleras válidas, si no null.
+function intentarPartirEscalera(comb, tile) {
+  const reales = comb.filter((t) => !t.is_joker);
+  if (reales.length < 4) return null;
+  // ordenar la combinación por número, intercalando jokers en huecos
+  const orden = reales.slice().sort((a, b) => a.number - b.number);
+  const jokers = comb.filter((t) => t.is_joker);
+  // Reconstruir secuencia con jokers en posiciones determinadas (no críticas aquí)
+  const seq = [];
+  let jIdx = 0;
+  for (let i = 0; i < orden.length; i++) {
+    seq.push(orden[i]);
+    if (i < orden.length - 1) {
+      let gap = orden[i + 1].number - orden[i].number - 1;
+      while (gap > 0 && jIdx < jokers.length) { seq.push(jokers[jIdx++]); gap--; }
+    }
+  }
+  while (jIdx < jokers.length) seq.push(jokers[jIdx++]);
+
+  const reglasActivas = (snapshotServidor && snapshotServidor.reglas) || {};
+  // Probar todas las posiciones donde el número de la ficha aparece en seq;
+  // intentar partir antes de esa posición, dejando una copia del número en cada lado.
+  const objetivos = [];
+  seq.forEach((t, i) => { if (!t.is_joker && t.number === tile.number) objetivos.push(i); });
+  for (const i of objetivos) {
+    // Izquierda: seq[0..i] + tile (en el lado derecho de la izquierda)
+    // Derecha: seq[i..end]
+    const izq = seq.slice(0, i + 1).map((t) => ({ ...t }));
+    const der = [{ ...tile }, ...seq.slice(i + 1).map((t) => ({ ...t }))];
+    // Forzamos que la nueva ficha vaya al lado derecho para "duplicar" el número:
+    // ahora ambos lados deben contener el número objetivo.
+    // izq termina en tile.number; der empieza en tile.number — exacto.
+    if (izq.length >= 3 && der.length >= 3 &&
+        combinacionValida(izq, reglasActivas) &&
+        combinacionValida(der, reglasActivas)) {
+      return [izq, der];
+    }
+    // Probar el otro reparto: tile va al lado izquierdo
+    const izq2 = [...seq.slice(0, i).map((t) => ({ ...t })), { ...tile }, seq[i]];
+    const der2 = seq.slice(i + 1).map((t) => ({ ...t }));
+    // Reordenar izq2 por número
+    izq2.sort((a, b) => (a.is_joker ? 99 : a.number) - (b.is_joker ? 99 : b.number));
+    if (izq2.length >= 3 && der2.length >= 3 &&
+        combinacionValida(izq2, reglasActivas) &&
+        combinacionValida(der2, reglasActivas)) {
+      return [izq2, der2];
+    }
+  }
+  return null;
+}
+
 // ============ Reconciliación con snapshot del servidor ============
 function reconciliarAtril(serverTiles) {
   // Preserva posiciones de los slots:
@@ -707,14 +814,17 @@ function atrilEstaVacio() {
   return true;
 }
 
+let turnoPrevio = null;
+let inicioTurnoActual = null;  // timestamp en s de cuando empezó el turno actual
+
 function aplicarSnapshot(snap) {
+  const cambioDeTurno = turnoPrevio !== null && turnoPrevio !== snap.turno;
   snapshotServidor = snap;
   // Al recibir snapshot del servidor, los stacks de undo/redo se invalidan
   undoStack = [];
   redoStack = [];
   mesaLocal = snap.mesa.map((comb) => comb.map((t) => ({ ...t })));
   if (atrilEstaVacio()) {
-    // Primera vez: reparto las 14 fichas en la fila superior (slots 0..13)
     atrilLocal = [Array(ATRIL_SLOTS_MIN).fill(null), Array(ATRIL_SLOTS_MIN).fill(null)];
     snap.tu_atril.forEach((t, i) => {
       if (i < ATRIL_SLOTS_MIN) atrilLocal[0][i] = { ...t };
@@ -724,21 +834,97 @@ function aplicarSnapshot(snap) {
     reconciliarAtril(snap.tu_atril);
   }
   miTurno = snap.turno === yo && !snap.ganador;
+  if (cambioDeTurno || inicioTurnoActual === null) {
+    inicioTurnoActual = Date.now() / 1000;
+  }
+  // Notificar cambio de turno
+  if (cambioDeTurno && !snap.ganador) {
+    if (miTurno) {
+      sonidoTuTurno();
+      decir("Es tu turno");
+    } else {
+      decir(`Turno de ${snap.turno}`);
+    }
+  }
+  turnoPrevio = snap.turno;
   ocultarEspera();
+  actualizarBannerTurno();
   render();
 }
 
-// ============ Cronómetro de partida ============
+function actualizarBannerTurno() {
+  const banner = $("banner-turno");
+  const nombreEl = $("banner-nombre");
+  if (!banner || !snapshotServidor) return;
+  if (!snapshotServidor.turno || snapshotServidor.ganador) {
+    banner.classList.add("hidden");
+    return;
+  }
+  banner.classList.remove("hidden");
+  nombreEl.textContent = snapshotServidor.turno + (miTurno ? " (tú)" : "");
+  banner.classList.toggle("tu-turno", miTurno);
+}
+
+// ============ Cronómetros: total + turno ============
+const LIMITE_TURNO_SEG = 180;  // 3 minutos
+let avisoTiempoEmitido = false;
+let autopasoEjecutado = false;
+
 function actualizarCronometro() {
+  // Total partida
   if (!snapshotServidor || !snapshotServidor.iniciada) {
     if (infoTiempo) infoTiempo.textContent = "⏱ --:--";
+  } else {
+    const ahora = Date.now() / 1000;
+    const transcurrido = Math.max(0, Math.floor(ahora - snapshotServidor.iniciada));
+    const m = Math.floor(transcurrido / 60);
+    const s = transcurrido % 60;
+    if (infoTiempo) infoTiempo.textContent = `⏱ ${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  }
+
+  // Tiempo del turno actual
+  const banner = $("banner-turno");
+  const cronotur = $("banner-cronotur");
+  if (!cronotur || !inicioTurnoActual || !snapshotServidor || snapshotServidor.ganador) {
+    if (cronotur) cronotur.textContent = "";
+    if (banner) banner.classList.remove("urgente");
     return;
   }
   const ahora = Date.now() / 1000;
-  const transcurrido = Math.max(0, Math.floor(ahora - snapshotServidor.iniciada));
-  const m = Math.floor(transcurrido / 60);
-  const s = transcurrido % 60;
-  if (infoTiempo) infoTiempo.textContent = `⏱ ${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  const restante = Math.max(0, LIMITE_TURNO_SEG - Math.floor(ahora - inicioTurnoActual));
+  const mm = Math.floor(restante / 60);
+  const ss = restante % 60;
+  cronotur.textContent = `${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
+  if (banner) banner.classList.toggle("urgente", restante <= 30);
+
+  // Aviso sonoro a 30s del fin si es mi turno
+  if (miTurno && restante === 30 && !avisoTiempoEmitido) {
+    avisoTiempoEmitido = true;
+    sonidoTiempoAviso();
+    decir("Treinta segundos");
+  }
+  if (restante > 30) avisoTiempoEmitido = false;
+
+  // Auto-pasar turno si se agota
+  if (miTurno && restante === 0 && !autopasoEjecutado) {
+    autopasoEjecutado = true;
+    decir("Tiempo agotado");
+    // Restaurar estado canónico (deshacer cualquier movimiento sin enviar) y robar
+    if (snapshotServidor) {
+      mesaLocal = snapshotServidor.mesa.map((c) => c.map((t) => ({ ...t })));
+      const idsMesa = new Set(mesaLocal.flat().map((t) => t.id));
+      for (let f = 0; f < atrilLocal.length; f++) {
+        for (let c = 0; c < atrilLocal[f].length; c++) {
+          if (atrilLocal[f][c] && idsMesa.has(atrilLocal[f][c].id)) atrilLocal[f][c] = null;
+        }
+      }
+      reconciliarAtril(snapshotServidor.tu_atril);
+      render();
+    }
+    sock.enviar({ type: "robar" });
+    mostrarToast("Tiempo agotado: has robado y pasado turno", "error");
+  }
+  if (restante > 0) autopasoEjecutado = false;
 }
 setInterval(actualizarCronometro, 1000);
 
@@ -807,6 +993,12 @@ $("btn-sonido").addEventListener("click", () => {
   try { localStorage.setItem("rk_sonido", sonidoActivo ? "on" : "off"); } catch (_) {}
   actualizarBotonSonido();
   if (sonidoActivo) clicSonido();
+});
+$("btn-voz").addEventListener("click", () => {
+  vozActiva = !vozActiva;
+  try { localStorage.setItem("rk_voz", vozActiva ? "on" : "off"); } catch (_) {}
+  actualizarBotonSonido();
+  if (vozActiva) decir("Voz activada");
 });
 actualizarBotonSonido();
 
@@ -907,11 +1099,13 @@ const sock = new RKSocket(codigo, nombre, {
     }
   },
   estado: (data) => aplicarSnapshot(data.snapshot),
-  error: (data) => mostrarToast(data.msg, "error"),
+  error: (data) => { mostrarToast(data.msg, "error"); sonidoError(); decir(data.msg); },
   fin_partida: (data) => {
     $("overlay-titulo").textContent = data.ganador === yo ? "¡Has ganado!" : "Fin de partida";
     $("overlay-msg").textContent = `Ganador: ${data.ganador}`;
     overlay.classList.remove("hidden");
+    sonidoVictoria();
+    decir(data.ganador === yo ? "Has ganado" : `Ha ganado ${data.ganador}`);
   },
 });
 sock.conectar();
