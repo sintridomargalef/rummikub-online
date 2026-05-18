@@ -20,11 +20,17 @@ class Sala:
     jugadores: list[str] = field(default_factory=list)  # nombres
     estado: Optional[GameState] = None
     creada: float = field(default_factory=time.time)
+    iniciada: Optional[float] = None   # cuando empezó la partida
+    ultima_accion: float = field(default_factory=time.time)
+    finalizada: Optional[float] = None  # cuando alguien ganó
     sockets: dict = field(default_factory=dict)  # nombre -> WebSocket
     reglas: dict = field(default_factory=dict)
 
     def lista(self) -> bool:
         return len(self.jugadores) == 2 and self.estado is not None
+
+    def tocar(self) -> None:
+        self.ultima_accion = time.time()
 
 
 class GestorSalas:

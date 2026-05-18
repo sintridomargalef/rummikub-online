@@ -4,10 +4,13 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import secrets
+import time
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Depends
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
 from .game.state import GameState
@@ -18,7 +21,24 @@ from .rooms import gestor
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
 
+INICIO_SERVER = time.time()
+ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "rummikub2026")
+
 app = FastAPI(title="Rummikub Online")
+security = HTTPBasic()
+
+
+def comprobar_admin(creds: HTTPBasicCredentials = Depends(security)) -> str:
+    ok_user = secrets.compare_digest(creds.username, ADMIN_USER)
+    ok_pass = secrets.compare_digest(creds.password, ADMIN_PASSWORD)
+    if not (ok_user and ok_pass):
+        raise HTTPException(
+            status_code=401,
+            detail="Credenciales inválidas",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return creds.username
 
 
 @app.post("/api/sala")
@@ -100,7 +120,9 @@ async def ws_juego(websocket: WebSocket, codigo: str, nombre: str):
     # si ya hay 2 jugadores y no se ha iniciado partida, iniciarla
     if len(sala.jugadores) == 2 and sala.estado is None:
         sala.estado = GameState.nueva_partida(sala.jugadores, reglas=sala.reglas)
+        sala.iniciada = time.time()
 
+    sala.tocar()
     if sala.estado is None:
         await _enviar_lobby(sala)
     else:
@@ -110,6 +132,7 @@ async def ws_juego(websocket: WebSocket, codigo: str, nombre: str):
         while True:
             data = await websocket.receive_json()
             tipo = data.get("type")
+            sala.tocar()
 
             if sala.estado is None:
                 await websocket.send_json({"type": "error", "msg": "Esperando al segundo jugador"})
@@ -129,6 +152,7 @@ async def ws_juego(websocket: WebSocket, codigo: str, nombre: str):
                 else:
                     await _broadcast_estado(sala)
                     if sala.estado.ganador:
+                        sala.finalizada = time.time()
                         for n, ws in list(sala.sockets.items()):
                             try:
                                 await ws.send_json({"type": "fin_partida", "ganador": sala.estado.ganador})
@@ -155,6 +179,82 @@ async def ws_juego(websocket: WebSocket, codigo: str, nombre: str):
         # Si la partida no había empezado y se va el creador, dejamos la sala
         # para que vuelva a entrar (durante 6h). Si ambos se van y nadie vuelve,
         # limpiar_viejas la borrará.
+
+
+# =========== Panel de administración ===========
+
+def _resumen_sala(sala) -> dict:
+    estado = sala.estado
+    info_jugadores = []
+    for nombre in sala.jugadores:
+        fichas = len(estado.atriles.get(nombre, [])) if estado else 0
+        info_jugadores.append({
+            "nombre": nombre,
+            "fichas": fichas,
+            "conectado": nombre in sala.sockets,
+            "ha_salido": (estado.ha_salido.get(nombre, False) if estado else False),
+        })
+    return {
+        "codigo": sala.codigo,
+        "jugadores": info_jugadores,
+        "partida_iniciada": estado is not None,
+        "turno": estado.turno if estado else None,
+        "mazo_restante": len(estado.mazo) if estado else None,
+        "combinaciones_mesa": len(estado.mesa) if estado else 0,
+        "ganador": estado.ganador if estado else None,
+        "reglas": sala.reglas,
+        "creada": sala.creada,
+        "iniciada": sala.iniciada,
+        "ultima_accion": sala.ultima_accion,
+        "finalizada": sala.finalizada,
+    }
+
+
+@app.get("/api/admin/state")
+async def admin_state(_user: str = Depends(comprobar_admin)):
+    salas = [_resumen_sala(s) for s in gestor.salas.values()]
+    salas.sort(key=lambda s: s["ultima_accion"], reverse=True)
+    return {
+        "ahora": time.time(),
+        "uptime": time.time() - INICIO_SERVER,
+        "total_salas": len(salas),
+        "salas_activas": sum(1 for s in salas if s["partida_iniciada"] and not s["ganador"]),
+        "salas": salas,
+    }
+
+
+@app.post("/api/admin/cerrar/{codigo}")
+async def admin_cerrar(codigo: str, _user: str = Depends(comprobar_admin)):
+    sala = gestor.obtener(codigo)
+    if not sala:
+        raise HTTPException(404, "Sala no encontrada")
+    # cerrar todos los sockets primero
+    for ws in list(sala.sockets.values()):
+        try:
+            await ws.close(code=1001)
+        except Exception:
+            pass
+    gestor.eliminar(sala.codigo)
+    return {"ok": True, "codigo": codigo}
+
+
+@app.post("/api/admin/cerrar-todas")
+async def admin_cerrar_todas(_user: str = Depends(comprobar_admin)):
+    codigos = list(gestor.salas.keys())
+    for cod in codigos:
+        sala = gestor.salas[cod]
+        for ws in list(sala.sockets.values()):
+            try:
+                await ws.close(code=1001)
+            except Exception:
+                pass
+        gestor.eliminar(cod)
+    return {"ok": True, "cerradas": len(codigos)}
+
+
+@app.get("/admin")
+async def admin_page(_user: str = Depends(comprobar_admin)):
+    return FileResponse(str(FRONTEND / "admin.html"))
 
 
 # Frontend estático

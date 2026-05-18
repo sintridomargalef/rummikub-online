@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rummikub Admin</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body.admin {
+      display: block;
+      padding: 20px;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--atril-borde);
+    }
+    .admin-header h1 { margin: 0; color: var(--acento); }
+    .metricas {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .metric {
+      background: var(--bg-2);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--atril-borde);
+    }
+    .metric-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--texto-tenue);
+    }
+    .metric-value {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--acento);
+      margin-top: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg-2);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--atril-borde);
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--atril-borde);
+    }
+    th {
+      background: var(--topbar);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--texto-tenue);
+    }
+    tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge.lobby { background: #b08a40; color: #1a1a1a; }
+    .badge.activa { background: var(--exito); color: white; }
+    .badge.final { background: #555; color: white; }
+    .badge.online { background: #2e7d32; color: white; }
+    .badge.offline { background: #555; color: #ccc; }
+    .acciones-tabla button {
+      padding: 4px 10px;
+      font-size: 12px;
+      background: var(--peligro);
+    }
+    .acciones-tabla button:hover { filter: brightness(1.15); }
+    .acciones-globales {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .acciones-globales button { background: var(--peligro); }
+    .vacio {
+      text-align: center;
+      padding: 40px;
+      color: var(--texto-tenue);
+    }
+    .info-text {
+      font-size: 12px;
+      color: var(--texto-tenue);
+      margin-top: 4px;
+    }
+    .ip-banner {
+      background: var(--bg-2);
+      border: 1px dashed var(--acento);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-family: monospace;
+    }
+    .ip-banner strong { color: var(--acento); }
+  </style>
+</head>
+<body class="admin theme-classic">
+  <header class="admin-header">
+    <h1>Panel de administración</h1>
+    <div>
+      <span id="info-uptime" class="info-text"></span>
+      <span id="info-now" class="info-text" style="margin-left: 12px;"></span>
+      <a href="/" style="margin-left: 16px; color: var(--acento);">Volver al lobby</a>
+    </div>
+  </header>
+
+  <div class="ip-banner">
+    URL para jugar: <strong id="url-publica">http://<tu-IP-pública></strong>
+    <div class="info-text">Comparte esta URL con María y demás parejas. Si el servidor está en LAN, también: <strong id="url-lan">http://192.168.1.40</strong></div>
+  </div>
+
+  <div class="metricas">
+    <div class="metric">
+      <div class="metric-label">Salas totales</div>
+      <div class="metric-value" id="m-total">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Partidas en curso</div>
+      <div class="metric-value" id="m-activas">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Refrescos</div>
+      <div class="metric-value" id="m-refrescos">0</div>
+    </div>
+  </div>
+
+  <div class="acciones-globales">
+    <button id="btn-refresh">↻ Refrescar</button>
+    <button id="btn-cerrar-todas">🗑 Cerrar todas las salas</button>
+    <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+      <input type="checkbox" id="chk-auto" checked>
+      Auto-refresco cada 5 s
+    </label>
+  </div>
+
+  <table id="tabla-salas">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Estado</th>
+        <th>Jugadores</th>
+        <th>Turno</th>
+        <th>Mesa / Mazo</th>
+        <th>Creada</th>
+        <th>Última acción</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="filas"></tbody>
+  </table>
+
+  <div id="vacio" class="vacio hidden">No hay salas activas ahora mismo.</div>
+
+  <script>
+    let refrescos = 0;
+    const $ = (id) => document.getElementById(id);
+    const fmtDuracion = (segs) => {
+      if (segs == null || isNaN(segs)) return "—";
+      segs = Math.max(0, Math.floor(segs));
+      if (segs < 60) return `${segs} s`;
+      const m = Math.floor(segs / 60);
+      const s = segs % 60;
+      if (m < 60) return `${m}m ${s}s`;
+      const h = Math.floor(m / 60);
+      return `${h}h ${m % 60}m`;
+    };
+    const fmtHora = (ts) => {
+      if (!ts) return "—";
+      const d = new Date(ts * 1000);
+      return d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    };
+
+    async function refrescar() {
+      try {
+        const r = await fetch("/api/admin/state", { credentials: "include" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const data = await r.json();
+        renderizar(data);
+        refrescos++;
+        $("m-refrescos").textContent = refrescos;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderizar(data) {
+      $("m-total").textContent = data.total_salas;
+      $("m-activas").textContent = data.salas_activas;
+      $("info-uptime").textContent = `Uptime: ${fmtDuracion(data.uptime)}`;
+      $("info-now").textContent = `Hora servidor: ${fmtHora(data.ahora)}`;
+
+      const tbody = $("filas");
+      tbody.innerHTML = "";
+      if (!data.salas.length) {
+        $("vacio").classList.remove("hidden");
+        $("tabla-salas").style.display = "none";
+        return;
+      }
+      $("vacio").classList.add("hidden");
+      $("tabla-salas").style.display = "";
+
+      for (const s of data.salas) {
+        const tr = document.createElement("tr");
+        let estadoBadge;
+        if (s.ganador) estadoBadge = `<span class="badge final">Finalizada · ganó ${s.ganador}</span>`;
+        else if (s.partida_iniciada) estadoBadge = `<span class="badge activa">En curso</span>`;
+        else estadoBadge = `<span class="badge lobby">Lobby</span>`;
+
+        const jugadores = s.jugadores.map(j => {
+          const conn = j.conectado ? `<span class="badge online">on</span>` : `<span class="badge offline">off</span>`;
+          const fichas = s.partida_iniciada ? ` · ${j.fichas} fichas` : "";
+          return `${j.nombre} ${conn}${fichas}`;
+        }).join("<br>") || "<i>vacía</i>";
+
+        const mesa = s.partida_iniciada ? `${s.combinaciones_mesa} combos · mazo ${s.mazo_restante}` : "—";
+        const turno = s.turno || "—";
+
+        tr.innerHTML = `
+          <td><strong>${s.codigo}</strong></td>
+          <td>${estadoBadge}</td>
+          <td>${jugadores}</td>
+          <td>${turno}</td>
+          <td>${mesa}</td>
+          <td>${fmtHora(s.creada)}<div class="info-text">hace ${fmtDuracion((data.ahora - s.creada))}</div></td>
+          <td>${fmtHora(s.ultima_accion)}<div class="info-text">hace ${fmtDuracion((data.ahora - s.ultima_accion))}</div></td>
+          <td class="acciones-tabla"><button data-codigo="${s.codigo}">Cerrar</button></td>
+        `;
+        tbody.appendChild(tr);
+      }
+      tbody.querySelectorAll("button[data-codigo]").forEach(btn => {
+        btn.addEventListener("click", () => cerrarSala(btn.dataset.codigo));
+      });
+    }
+
+    async function cerrarSala(codigo) {
+      if (!confirm(`¿Cerrar la sala ${codigo} y echar a los jugadores?`)) return;
+      const r = await fetch(`/api/admin/cerrar/${codigo}`, { method: "POST", credentials: "include" });
+      if (r.ok) refrescar();
+      else alert("Error: " + r.status);
+    }
+
+    $("btn-cerrar-todas").addEventListener("click", async () => {
+      if (!confirm("¿Cerrar TODAS las salas?")) return;
+      const r = await fetch("/api/admin/cerrar-todas", { method: "POST", credentials: "include" });
+      if (r.ok) refrescar();
+    });
+
+    $("btn-refresh").addEventListener("click", refrescar);
+
+    // URLs visibles
+    $("url-lan").textContent = `http://${location.hostname === "localhost" ? "192.168.1.40" : location.hostname}`;
+    $("url-publica").textContent = `http://${location.host}`;
+
+    // Auto-refresco
+    let timer = null;
+    function arrancarAuto() {
+      if (timer) clearInterval(timer);
+      if ($("chk-auto").checked) timer = setInterval(refrescar, 5000);
+    }
+    $("chk-auto").addEventListener("change", arrancarAuto);
+    arrancarAuto();
+    refrescar();
+  </script>
+</body>
+</html>
