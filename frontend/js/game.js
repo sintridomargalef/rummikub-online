@@ -137,6 +137,13 @@ function combinacionValida(fichas, reglas) {
 
 // Snapshot canónico recibido del servidor (referencia para "deshacer").
 let snapshotServidor = null;
+// IDs de fichas que estaban en la mesa al empezar el turno
+let idsMesaAlInicio = new Set();
+// IDs de fichas recién jugadas por el rival (para resaltarlas)
+let ultimasFichasNuevas = new Set();
+let ultimaMesaSnapshot = null;
+// Último combo donde se colocó una ficha (para doble-click)
+let ultimoDropIdx = null;
 // Estado local mutable: mesa y atril.
 // Atril es ahora una rejilla 2 filas × SLOTS columnas. Cada celda contiene un tile o null.
 const ATRIL_FILAS = 2;
@@ -186,13 +193,30 @@ function renderFicha(tile, dragHabilitado) {
   const div = document.createElement("div");
   div.className = "ficha";
   div.dataset.id = tile.id;
+  if (!dragHabilitado && ultimasFichasNuevas.has(tile.id)) {
+    div.classList.add("recien-jugada");
+  }
   if (tile.is_joker) {
     div.classList.add("joker");
   } else {
     div.classList.add(tile.color);
     div.textContent = tile.number;
   }
-  if (dragHabilitado) attachPointerDrag(div, tile);
+  if (dragHabilitado) {
+    attachPointerDrag(div, tile);
+    div.addEventListener("dblclick", () => {
+      if (!miTurno || ultimoDropIdx === null) return;
+      guardarParaDeshacer();
+      const t = quitarFicha(tile.id);
+      if (!t) return;
+      mesaLocal[ultimoDropIdx].push(t);
+      autoOrdenarSiEsEscalera(ultimoDropIdx);
+      limpiarCombinacionesVacias();
+      compactarTail();
+      clicSonido();
+      render();
+    });
+  }
   return div;
 }
 
@@ -267,6 +291,9 @@ function render() {
     const chip = document.getElementById("info-reglas");
     const activas = [];
     if (reglas.wrap_13_to_1) activas.push("1 tras 13");
+    if (reglas.tiempo_total) activas.push(`⏱${Math.round(reglas.tiempo_total / 60)}min`);
+    if (reglas.juego_extremo) activas.push("🔥 EXTREMO");
+    else if (reglas.tiempo_turno) activas.push(`⌛${reglas.tiempo_turno}seg`);
     if (activas.length) {
       chip.textContent = "Reglas: " + activas.join(", ");
       chip.classList.remove("hidden");
@@ -278,19 +305,45 @@ function render() {
   document.body.classList.toggle("no-mi-turno", !miTurno);
   const jugadaEnCurso = miTurno && hayCambiosRespectoServidor();
   const hayInvalidas = mesaLocal.some((c) => !combinacionValida(c, reglasActivas));
-  $("btn-fin-turno").disabled = !miTurno || hayInvalidas;
+  const mesaEnAtril = miTurno && hayFichasMesaEnAtril();
+
+  const bannerMesaAtril = $("banner-mesa-atril");
+  if (mesaEnAtril) {
+    bannerMesaAtril.classList.remove("hidden");
+  } else {
+    bannerMesaAtril.classList.add("hidden");
+  }
+
+  $("btn-fin-turno").disabled = !miTurno || hayInvalidas || mesaEnAtril;
   $("btn-fin-turno").title = hayInvalidas
     ? "Tienes combinaciones inválidas (en rojo)"
-    : "";
-  $("btn-robar").disabled = !miTurno || jugadaEnCurso;
+    : mesaEnAtril
+      ? "Fichas de la mesa en tu atril — devuélvelas primero"
+      : "";
+  $("btn-robar").disabled = !miTurno || (!hayInvalidas && !mesaEnAtril);
   $("btn-deshacer").disabled = !miTurno || (undoStack.length === 0 && !jugadaEnCurso);
   $("btn-rehacer").disabled = !miTurno || redoStack.length === 0;
+
+  const hint = $("hint-dobleclick");
+  if (miTurno && ultimoDropIdx !== null) {
+    hint.classList.remove("hidden");
+  } else {
+    hint.classList.add("hidden");
+  }
 }
 
 function fichasEnAtril() {
   const res = [];
   for (const fila of atrilLocal) for (const t of fila) if (t) res.push(t);
   return res;
+}
+
+function idsMesaEnAtril() {
+  return new Set(fichasEnAtril().filter((t) => idsMesaAlInicio.has(t.id)).map((t) => t.id));
+}
+
+function hayFichasMesaEnAtril() {
+  return idsMesaEnAtril().size > 0;
 }
 
 function hayCambiosRespectoServidor() {
@@ -637,11 +690,13 @@ function finalizarDrag(target, clientX) {
     if (!t) return;
     if (idx === "nueva") {
       mesaLocal.push([t]);
+      ultimoDropIdx = mesaLocal.length - 1;
     } else {
       const pos = posicionInsercion(target, clientX);
       const idxNum = parseInt(idx, 10);
       mesaLocal[idxNum].splice(pos, 0, t);
       autoOrdenarSiEsEscalera(idxNum);
+      ultimoDropIdx = idxNum;
     }
     limpiarCombinacionesVacias();
     compactarTail();
@@ -837,6 +892,19 @@ function aplicarSnapshot(snap) {
   if (cambioDeTurno || inicioTurnoActual === null) {
     inicioTurnoActual = Date.now() / 1000;
   }
+  if (cambioDeTurno) {
+    idsMesaAlInicio = new Set(snap.mesa.flat().map((t) => t.id));
+  }
+  if (cambioDeTurno) {
+    if (turnoPrevio !== null && turnoPrevio !== yo) {
+      const idsPrevios = new Set((ultimaMesaSnapshot || []).flat().map((t) => t.id));
+      const idsActuales = new Set(snap.mesa.flat().map((t) => t.id));
+      ultimasFichasNuevas = new Set([...idsActuales].filter((id) => !idsPrevios.has(id)));
+    } else {
+      ultimasFichasNuevas = new Set();
+    }
+  }
+  ultimaMesaSnapshot = snap.mesa;
   // Notificar cambio de turno
   if (cambioDeTurno && !snap.ganador) {
     if (miTurno) {
@@ -866,38 +934,83 @@ function actualizarBannerTurno() {
 }
 
 // ============ Cronómetros: total + turno ============
-const LIMITE_TURNO_SEG = 180;  // 3 minutos
 let avisoTiempoEmitido = false;
 let autopasoEjecutado = false;
 
+function limiteTurnoSeg() {
+  const r = snapshotServidor && snapshotServidor.reglas;
+  if (!r || !r.tiempo_total || !r.tiempo_turno) {
+    return 0;  // sin límite
+  }
+  if (r.juego_extremo) {
+    // turno proporcional al tiempo total restante
+    const ahora = Date.now() / 1000;
+    const restanteTotal = Math.max(0, r.tiempo_total - Math.floor(ahora - snapshotServidor.iniciada));
+    // mínimo 5s, máximo 1/15 del tiempo restante
+    const divisor = r.tiempo_turno || 15; // si no configuraron, default 15
+    return Math.max(5, Math.ceil(restanteTotal / divisor));
+  }
+  return r.tiempo_turno;
+}
+
+function tiempoTotalRestante() {
+  const r = snapshotServidor && snapshotServidor.reglas;
+  if (!r || !r.tiempo_total || !snapshotServidor.iniciada) return -1;
+  const ahora = Date.now() / 1000;
+  return Math.max(0, r.tiempo_total - Math.floor(ahora - snapshotServidor.iniciada));
+}
+
 function actualizarCronometro() {
-  // Total partida
+  const bannerTotal = $("banner-tiempo-total");
   if (!snapshotServidor || !snapshotServidor.iniciada) {
     if (infoTiempo) infoTiempo.textContent = "⏱ --:--";
+    if (bannerTotal) {
+      bannerTotal.textContent = "00:00";
+      bannerTotal.classList.remove("urgente");
+    }
   } else {
-    const ahora = Date.now() / 1000;
-    const transcurrido = Math.max(0, Math.floor(ahora - snapshotServidor.iniciada));
-    const m = Math.floor(transcurrido / 60);
-    const s = transcurrido % 60;
-    if (infoTiempo) infoTiempo.textContent = `⏱ ${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    const restante = tiempoTotalRestante();
+    let m, s, urgente = false;
+    if (restante < 0) {
+      // sin límite total: mostrar transcurrido
+      const ahora = Date.now() / 1000;
+      const t = Math.floor(ahora - snapshotServidor.iniciada);
+      m = Math.floor(t / 60);
+      s = t % 60;
+    } else {
+      m = Math.floor(restante / 60);
+      s = restante % 60;
+      urgente = restante <= 60;
+    }
+    const txt = `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    if (infoTiempo) {
+      infoTiempo.textContent = `⏱ ${txt}`;
+      infoTiempo.style.color = urgente ? "var(--peligro)" : "";
+    }
+    if (bannerTotal) {
+      bannerTotal.textContent = txt;
+      bannerTotal.classList.toggle("urgente", urgente);
+    }
   }
 
-  // Tiempo del turno actual
   const banner = $("banner-turno");
   const cronotur = $("banner-cronotur");
-  if (!cronotur || !inicioTurnoActual || !snapshotServidor || snapshotServidor.ganador) {
+  const limite = limiteTurnoSeg();
+
+  if (!cronotur || !inicioTurnoActual || !snapshotServidor || snapshotServidor.ganador || limite === 0) {
     if (cronotur) cronotur.textContent = "";
     if (banner) banner.classList.remove("urgente");
     return;
   }
+
   const ahora = Date.now() / 1000;
-  const restante = Math.max(0, LIMITE_TURNO_SEG - Math.floor(ahora - inicioTurnoActual));
+  const restante = Math.max(0, limite - Math.floor(ahora - inicioTurnoActual));
   const mm = Math.floor(restante / 60);
   const ss = restante % 60;
   cronotur.textContent = `${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
   if (banner) banner.classList.toggle("urgente", restante <= 30);
 
-  // Aviso sonoro a 30s del fin si es mi turno
+  // Aviso sonoro a 30s si es mi turno
   if (miTurno && restante === 30 && !avisoTiempoEmitido) {
     avisoTiempoEmitido = true;
     sonidoTiempoAviso();
@@ -905,24 +1018,30 @@ function actualizarCronometro() {
   }
   if (restante > 30) avisoTiempoEmitido = false;
 
-  // Auto-pasar turno si se agota
+  // Auto-pasar si se agota
   if (miTurno && restante === 0 && !autopasoEjecutado) {
     autopasoEjecutado = true;
     decir("Tiempo agotado");
-    // Restaurar estado canónico (deshacer cualquier movimiento sin enviar) y robar
-    if (snapshotServidor) {
-      mesaLocal = snapshotServidor.mesa.map((c) => c.map((t) => ({ ...t })));
-      const idsMesa = new Set(mesaLocal.flat().map((t) => t.id));
-      for (let f = 0; f < atrilLocal.length; f++) {
-        for (let c = 0; c < atrilLocal[f].length; c++) {
-          if (atrilLocal[f][c] && idsMesa.has(atrilLocal[f][c].id)) atrilLocal[f][c] = null;
+    if (hayCambiosRespectoServidor()) {
+      const mesa = mesaLocal.map((c) => c.map((t) => t.id));
+      const atril = fichasEnAtril().map((t) => t.id);
+      sock.enviar({ type: "proponer_jugada", mesa, atril });
+      mostrarToast("Tiempo agotado — enviando jugada...", "ok");
+    } else {
+      if (snapshotServidor) {
+        mesaLocal = snapshotServidor.mesa.map((c) => c.map((t) => ({ ...t })));
+        const idsMesa = new Set(mesaLocal.flat().map((t) => t.id));
+        for (let f = 0; f < atrilLocal.length; f++) {
+          for (let c = 0; c < atrilLocal[f].length; c++) {
+            if (atrilLocal[f][c] && idsMesa.has(atrilLocal[f][c].id)) atrilLocal[f][c] = null;
+          }
         }
+        reconciliarAtril(snapshotServidor.tu_atril);
+        render();
       }
-      reconciliarAtril(snapshotServidor.tu_atril);
-      render();
+      sock.enviar({ type: "robar" });
+      mostrarToast("Tiempo agotado: has robado y pasado turno", "error");
     }
-    sock.enviar({ type: "robar" });
-    mostrarToast("Tiempo agotado: has robado y pasado turno", "error");
   }
   if (restante > 0) autopasoEjecutado = false;
 }
@@ -936,6 +1055,18 @@ $("btn-fin-turno").addEventListener("click", () => {
 });
 
 $("btn-robar").addEventListener("click", () => {
+  if (hayFichasMesaEnAtril() && snapshotServidor) {
+    mesaLocal = snapshotServidor.mesa.map((c) => c.map((t) => ({ ...t })));
+    const idsMesaSnap = new Set(mesaLocal.flat().map((t) => t.id));
+    for (let f = 0; f < atrilLocal.length; f++) {
+      for (let c = 0; c < atrilLocal[f].length; c++) {
+        if (atrilLocal[f][c] && idsMesaSnap.has(atrilLocal[f][c].id)) atrilLocal[f][c] = null;
+      }
+    }
+    reconciliarAtril(snapshotServidor.tu_atril);
+    render();
+    idsMesaAlInicio = idsMesaSnap;
+  }
   sock.enviar({ type: "robar" });
 });
 

@@ -409,13 +409,42 @@ body.game {
 .banner-turno {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 16px;
-  padding: 12px 16px;
+  padding: 12px 24px;
   background: var(--bg-2);
   border-bottom: 3px solid var(--acento);
   font-family: var(--titulo-font);
   box-shadow: 0 2px 12px rgba(0,0,0,.4);
+}
+.banner-grupo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.banner-grupo-turno { flex: 1; }
+.banner-mini-label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--texto-tenue);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.banner-tiempo-total {
+  font-size: 24px;
+  font-family: monospace;
+  font-weight: 800;
+  color: var(--acento);
+  padding: 2px 10px;
+  border: 2px solid var(--acento);
+  border-radius: 6px;
+  letter-spacing: 1px;
+}
+.banner-tiempo-total.urgente {
+  color: #ff3030;
+  border-color: #ff3030;
+  animation: parpadeo 1s ease-in-out infinite;
 }
 .banner-turno .banner-label {
   font-size: 18px;
@@ -492,10 +521,12 @@ body.game {
 }
 
 @media (max-width: 700px) {
-  .banner-turno { gap: 8px; padding: 6px 8px; }
-  .banner-turno .banner-label { font-size: 12px; letter-spacing: 2px; }
-  .banner-turno .banner-nombre { font-size: 24px; }
-  .banner-turno .banner-cronotur { font-size: 16px; padding: 2px 8px; }
+  .banner-turno { gap: 6px; padding: 4px 8px; }
+  .banner-turno .banner-label { font-size: 11px; letter-spacing: 2px; }
+  .banner-turno .banner-nombre { font-size: 22px; }
+  .banner-turno .banner-cronotur { font-size: 14px; padding: 2px 6px; }
+  .banner-tiempo-total { font-size: 14px; padding: 2px 6px; }
+  .banner-mini-label { font-size: 9px; letter-spacing: 1px; }
   .banner-mesa-atril { font-size: 13px; padding: 6px 10px; }
 }
 
@@ -692,6 +723,43 @@ body.theme-cyberpunk .ficha {
   border: 1px solid var(--acento);
 }
 .overlay-box h2 { margin-top: 0; color: var(--acento); }
+
+/* ===== Ranking ===== */
+.btn-ranking {
+  width: 100%;
+  margin-top: 14px;
+  background: transparent;
+  border: 2px solid var(--acento);
+  color: var(--acento);
+  font-weight: 700;
+}
+.btn-ranking:hover { background: var(--acento); color: var(--bg); }
+.ranking-box { max-width: 480px; width: 92vw; }
+.ranking-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 18px;
+  background: var(--bg-input);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ranking-tabla th, .ranking-tabla td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--atril-borde);
+}
+.ranking-tabla th {
+  background: var(--topbar);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--texto-tenue);
+}
+.ranking-tabla td:first-child { text-align: center; font-size: 18px; width: 50px; }
+.ranking-tabla td:nth-child(3),
+.ranking-tabla td:nth-child(4),
+.ranking-tabla td:nth-child(5) { text-align: right; font-family: monospace; }
+.ranking-tabla tbody tr:hover { background: rgba(255,255,255,.04); }
 
 /* ===== Responsive (móvil) ===== */
 @media (max-width: 700px) {
