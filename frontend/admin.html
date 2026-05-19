@@ -170,6 +170,34 @@
 
   <div id="vacio" class="vacio hidden">No hay salas activas ahora mismo.</div>
 
+  <h2 style="margin: 28px 0 12px; color: var(--acento);">🏆 Ranking de jugadores</h2>
+
+  <div class="acciones-globales" style="gap:10px;">
+    <input id="rk-viejo" type="text" placeholder="Nombre actual" maxlength="40"
+           style="background:var(--bg-input); color:var(--texto); border:1px solid var(--atril-borde); padding:6px 10px; border-radius:4px; width:180px;">
+    <span style="opacity:.6;">→</span>
+    <input id="rk-nuevo" type="text" placeholder="Nombre nuevo (fusiona si existe)" maxlength="40"
+           style="background:var(--bg-input); color:var(--texto); border:1px solid var(--atril-borde); padding:6px 10px; border-radius:4px; width:220px;">
+    <button id="btn-renombrar" style="background:var(--primario);">Renombrar / Fusionar</button>
+    <button id="btn-reset-ranking" style="background:var(--peligro); margin-left:auto;">🗑 Reset total</button>
+  </div>
+
+  <table id="tabla-ranking">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Jugador</th>
+        <th>Partidas</th>
+        <th>Victorias</th>
+        <th>%</th>
+        <th>Última partida</th>
+      </tr>
+    </thead>
+    <tbody id="filas-ranking"></tbody>
+  </table>
+
+  <div id="vacio-ranking" class="vacio hidden">Todavía no hay partidas registradas.</div>
+
   <script>
     let refrescos = 0;
     const $ = (id) => document.getElementById(id);
@@ -275,11 +303,89 @@
     let timer = null;
     function arrancarAuto() {
       if (timer) clearInterval(timer);
-      if ($("chk-auto").checked) timer = setInterval(refrescar, 5000);
+      if ($("chk-auto").checked) timer = setInterval(() => { refrescar(); cargarRanking(); }, 5000);
     }
     $("chk-auto").addEventListener("change", arrancarAuto);
     arrancarAuto();
     refrescar();
+
+    // ===== Ranking =====
+    function escapar(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    }
+
+    async function cargarRanking() {
+      try {
+        const r = await fetch("/api/admin/ranking");
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const data = await r.json();
+        renderRanking(data.ranking);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderRanking(ranking) {
+      const tbody = $("filas-ranking");
+      const vacio = $("vacio-ranking");
+      tbody.innerHTML = "";
+      if (!ranking || ranking.length === 0) {
+        vacio.classList.remove("hidden");
+        $("tabla-ranking").style.display = "none";
+        return;
+      }
+      vacio.classList.add("hidden");
+      $("tabla-ranking").style.display = "";
+      ranking.forEach((j, i) => {
+        const medalla = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (i + 1);
+        const ultima = j.ultima_partida ? new Date(j.ultima_partida * 1000).toLocaleDateString("es-ES") + " " + new Date(j.ultima_partida * 1000).toLocaleTimeString("es-ES", {hour:"2-digit", minute:"2-digit"}) : "—";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${medalla}</td>
+          <td><strong>${escapar(j.nombre)}</strong></td>
+          <td>${j.partidas}</td>
+          <td>${j.victorias}</td>
+          <td>${j.porcentaje}%</td>
+          <td>${ultima}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    $("btn-renombrar").addEventListener("click", async () => {
+      const viejo = $("rk-viejo").value.trim();
+      const nuevo = $("rk-nuevo").value.trim();
+      if (!viejo || !nuevo) { alert("Rellena ambos nombres"); return; }
+      if (viejo === nuevo) { alert("Son el mismo nombre"); return; }
+      try {
+        const r = await fetch("/api/admin/ranking/renombrar", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ viejo, nuevo })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || "Error");
+        $("rk-viejo").value = "";
+        $("rk-nuevo").value = "";
+        cargarRanking();
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    });
+
+    $("btn-reset-ranking").addEventListener("click", async () => {
+      if (!confirm("¿Borrar TODO el ranking? Esta acción es irreversible.")) return;
+      if (!confirm("¿De verdad? Se perderán todas las estadísticas.")) return;
+      try {
+        const r = await fetch("/api/admin/ranking/reset", { method: "POST" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        cargarRanking();
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    });
+
+    cargarRanking();
   </script>
 </body>
 </html>

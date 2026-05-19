@@ -89,7 +89,20 @@
     </div>
 
     <p id="msg" class="msg"></p>
+
+    <button id="btn-ranking" class="btn-ranking">🏆 Ver Ranking</button>
   </main>
+
+  <div id="overlay-ranking" class="overlay hidden">
+    <div class="overlay-box ranking-box">
+      <h2>🏆 Ranking de jugadores</h2>
+      <div id="ranking-contenido">
+        <p style="text-align:center; opacity:.6;">Cargando…</p>
+      </div>
+      <button id="btn-cerrar-ranking">Cerrar</button>
+    </div>
+  </div>
+
   <script>
     document.getElementById("regla-juego-extremo").addEventListener("change", function() {
       document.getElementById("tiempo-turno").disabled = this.checked;

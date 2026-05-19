@@ -18,6 +18,10 @@ function validarNombre() {
 function recogerReglas() {
   return {
     wrap_13_to_1: document.getElementById("regla-wrap_13_to_1").checked,
+    tiempo_total: parseInt(document.getElementById("tiempo-total").value),
+    tiempo_turno: parseInt(document.getElementById("tiempo-turno").value),
+    juego_extremo: document.getElementById("regla-juego-extremo").checked,
+    contra_ia: document.getElementById("regla-contra-ia").checked,
   };
 }
 
@@ -75,3 +79,57 @@ if (joinParam) {
 }
 
 $("nombre").focus();
+
+// ====== Ranking ======
+const overlayRanking = $("overlay-ranking");
+const btnRanking = $("btn-ranking");
+const btnCerrarRanking = $("btn-cerrar-ranking");
+const rankingContenido = $("ranking-contenido");
+
+async function cargarRanking() {
+  try {
+    const r = await fetch("/api/ranking");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    renderRanking(data.ranking);
+  } catch (e) {
+    rankingContenido.innerHTML = `<p style="text-align:center;color:#c44;">Error al cargar: ${e.message}</p>`;
+  }
+}
+
+function renderRanking(ranking) {
+  if (!ranking || ranking.length === 0) {
+    rankingContenido.innerHTML = `<p style="text-align:center;opacity:.7;">Todavía no hay partidas registradas.<br>¡Sé el primero!</p>`;
+    return;
+  }
+  let html = `<table class="ranking-tabla"><thead><tr>
+    <th>#</th><th>Jugador</th><th>Partidas</th><th>Victorias</th><th>%</th>
+  </tr></thead><tbody>`;
+  ranking.forEach((j, i) => {
+    const medalla = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (i + 1);
+    html += `<tr>
+      <td>${medalla}</td>
+      <td><strong>${escapar(j.nombre)}</strong></td>
+      <td>${j.partidas}</td>
+      <td>${j.victorias}</td>
+      <td>${j.porcentaje}%</td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  rankingContenido.innerHTML = html;
+}
+
+function escapar(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+btnRanking.addEventListener("click", () => {
+  rankingContenido.innerHTML = `<p style="text-align:center;opacity:.6;">Cargando…</p>`;
+  overlayRanking.classList.remove("hidden");
+  cargarRanking();
+});
+
+btnCerrarRanking.addEventListener("click", () => overlayRanking.classList.add("hidden"));
+overlayRanking.addEventListener("click", (e) => {
+  if (e.target === overlayRanking) overlayRanking.classList.add("hidden");
+});
