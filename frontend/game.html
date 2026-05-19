@@ -24,6 +24,9 @@
       <button id="btn-ayuda" title="Agrupar por colores, de menor a mayor">Ayuda</button>
       <button id="btn-sonido" title="Activar/desactivar sonido">🔊</button>
       <button id="btn-voz" title="Activar/desactivar voz">🗣</button>
+      <button id="btn-camara" title="Activar/desactivar cámara">📷 OFF</button>
+      <button id="btn-mic" title="Activar/desactivar micrófono">🎤 OFF</button>
+      <button id="btn-chat" title="Mostrar/ocultar chat">💬</button>
       <div class="theme-picker">
         <select id="theme-select">
           <option value="theme-classic">Clásico</option>
@@ -65,6 +68,28 @@
     <div id="atril-1" class="atril" data-fila="1" aria-label="Tu atril, fila inferior"></div>
   </footer>
 
+  <!-- Panel de vídeo + chat -->
+  <aside id="panel-comm" class="panel-comm hidden">
+    <div class="panel-videos">
+      <div class="video-tile">
+        <video id="video-local" autoplay playsinline muted></video>
+        <span class="video-label">Tú</span>
+      </div>
+      <div class="video-tile">
+        <video id="video-remoto" autoplay playsinline></video>
+        <span class="video-label" id="video-remoto-label">Rival</span>
+        <div class="video-placeholder" id="video-remoto-placeholder">Sin cámara</div>
+      </div>
+    </div>
+    <div class="panel-chat">
+      <div id="chat-mensajes" class="chat-mensajes"></div>
+      <form id="chat-form" class="chat-form" autocomplete="off">
+        <input id="chat-input" type="text" maxlength="200" placeholder="Escribe un mensaje…">
+        <button type="submit">↑</button>
+      </form>
+    </div>
+  </aside>
+
   <div id="toast" class="toast hidden"></div>
 
   <div id="espera" class="overlay hidden">
@@ -91,5 +116,6 @@
   <script src="/static/js/theme.js"></script>
   <script src="/static/js/ws.js"></script>
   <script src="/static/js/game.js"></script>
+  <script src="/static/js/comm.js"></script>
 </body>
 </html>

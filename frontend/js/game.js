@@ -1240,5 +1240,6 @@ const sock = new RKSocket(codigo, nombre, {
   },
 });
 sock.conectar();
+window.sock = sock;  // expuesto para comm.js
 
 infoTurno.textContent = `Sala ${codigo} — conectando…`;
