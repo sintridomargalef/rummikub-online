@@ -204,17 +204,15 @@ function renderFicha(tile, dragHabilitado) {
   }
   if (dragHabilitado) {
     attachPointerDrag(div, tile);
-    div.addEventListener("dblclick", () => {
-      if (!miTurno || ultimoDropIdx === null) return;
-      guardarParaDeshacer();
-      const t = quitarFicha(tile.id);
-      if (!t) return;
-      mesaLocal[ultimoDropIdx].push(t);
-      autoOrdenarSiEsEscalera(ultimoDropIdx);
-      limpiarCombinacionesVacias();
-      compactarTail();
-      clicSonido();
-      render();
+    // Click derecho cancela el "último drop" para que clicks futuros no añadan ahí
+    div.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      if (!miTurno) return;
+      if (ultimoDropIdx !== null) {
+        ultimoDropIdx = null;
+        clicSonido();
+        render();
+      }
     });
   }
   return div;
@@ -325,10 +323,12 @@ function render() {
   $("btn-rehacer").disabled = !miTurno || redoStack.length === 0;
 
   const hint = $("hint-dobleclick");
-  if (miTurno && ultimoDropIdx !== null) {
+  if (miTurno) {
     hint.classList.remove("hidden");
+    hint.classList.toggle("activo", ultimoDropIdx !== null);
   } else {
     hint.classList.add("hidden");
+    hint.classList.remove("activo");
   }
 }
 
@@ -536,6 +536,9 @@ function iniciarDrag(e, srcEl, tile) {
     pointerId: e.pointerId,
     offsetX: e.clientX - rect.left,
     offsetY: e.clientY - rect.top,
+    inicioX: e.clientX,
+    inicioY: e.clientY,
+    movido: false,
   };
   // captura: aunque salgamos del elemento, seguimos recibiendo eventos
   try { srcEl.setPointerCapture(e.pointerId); } catch (_) {}
@@ -593,6 +596,9 @@ document.addEventListener("pointermove", (e) => {
     return;
   }
   if (!pdrag || e.pointerId !== pdrag.pointerId) return;
+  const dx = e.clientX - pdrag.inicioX;
+  const dy = e.clientY - pdrag.inicioY;
+  if (dx * dx + dy * dy > 36) pdrag.movido = true;  // umbral 6 px
   posicionarGhost(e.clientX, e.clientY);
   marcarDropTargetSegunPunto(e.clientX, e.clientY);
 });
@@ -619,11 +625,33 @@ document.addEventListener("pointercancel", () => {
 
 function finalizarDrag(target, clientX) {
   if (!pdrag) return;
-  const { tile, srcEl, ghost } = pdrag;
+  const { tile, srcEl, ghost, movido } = pdrag;
   ghost.remove();
   srcEl.classList.remove("dragging");
   limpiarMarcasDrop();
   pdrag = null;
+
+  // Si NO hubo movimiento real, fue un click izquierdo — añadir a la última combinación.
+  if (!movido) {
+    if (miTurno && ultimoDropIdx !== null && mesaLocal[ultimoDropIdx]) {
+      // Solo si la ficha viene del atril (no de la mesa)
+      let enAtril = false;
+      for (const fila of atrilLocal) if (fila.some(t => t && t.id === tile.id)) { enAtril = true; break; }
+      if (enAtril) {
+        guardarParaDeshacer();
+        const t = quitarFicha(tile.id);
+        if (t) {
+          mesaLocal[ultimoDropIdx].push(t);
+          autoOrdenarSiEsEscalera(ultimoDropIdx);
+          limpiarCombinacionesVacias();
+          compactarTail();
+          clicSonido();
+          render();
+        }
+      }
+    }
+    return;
+  }
 
   if (!target) return;
   const tipo = target.dataset.dropTipo;

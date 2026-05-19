@@ -516,9 +516,17 @@ body.game {
   color: var(--texto);
   font-size: 13px;
   font-weight: 600;
-  border-bottom: 1px solid var(--acento);
-  opacity: 0.8;
+  border-bottom: 1px solid var(--atril-borde);
+  opacity: 0.7;
+  transition: opacity .2s, background .2s;
 }
+.hint-dobleclick.activo {
+  opacity: 1;
+  background: linear-gradient(90deg, transparent, var(--acento) 50%, transparent);
+  color: var(--bg);
+  border-bottom: 2px solid var(--acento);
+}
+.hint-dobleclick strong { font-weight: 800; }
 
 @media (max-width: 700px) {
   .banner-turno { gap: 6px; padding: 4px 8px; }
