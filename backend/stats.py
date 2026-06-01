@@ -113,6 +113,11 @@ def ranking() -> list[dict]:
         victorias_ia    = int(info.get("victorias_ia", 0))
         partidas_h      = int(info.get("partidas_humano", 0))
         partidas_ia_    = int(info.get("partidas_ia", 0))
+        # Migración suave: si no hay desglose pero sí totales,
+        # asumimos que todo lo histórico fue contra humanos.
+        if partidas_h == 0 and partidas_ia_ == 0 and partidas > 0:
+            partidas_h   = partidas
+            victorias_h  = victorias
         pct             = round(victorias / partidas * 100, 1) if partidas else 0.0
         pct_h           = round(victorias_h / partidas_h * 100, 1) if partidas_h else 0.0
         pct_ia          = round(victorias_ia / partidas_ia_ * 100, 1) if partidas_ia_ else 0.0

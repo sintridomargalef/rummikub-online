@@ -1063,32 +1063,61 @@ body.theme-cyberpunk .ficha {
   font-weight: 700;
 }
 .btn-ranking:hover { background: var(--acento); color: var(--bg); }
-.ranking-box { max-width: 480px; width: 92vw; }
+.ranking-box { max-width: 560px; width: 95vw; }
+
 .ranking-tabla {
   width: 100%;
   border-collapse: collapse;
   margin: 12px 0 18px;
-  background: var(--bg-input);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
+  font-size: 13px;
 }
 .ranking-tabla th, .ranking-tabla td {
   padding: 8px 10px;
-  text-align: left;
+  text-align: center;
   border-bottom: 1px solid var(--atril-borde);
 }
-.ranking-tabla th {
-  background: var(--topbar);
+/* Header de grupo (Humanos / IA) */
+.rk-grupo-header {
   font-size: 12px;
-  text-transform: uppercase;
+  font-weight: 800;
   letter-spacing: 1px;
-  color: var(--texto-tenue);
+  text-transform: uppercase;
+  padding: 6px 8px 4px;
 }
-.ranking-tabla td:first-child { text-align: center; font-size: 18px; width: 50px; }
-.ranking-tabla td:nth-child(3),
-.ranking-tabla td:nth-child(4),
-.ranking-tabla td:nth-child(5) { text-align: right; font-family: monospace; }
-.ranking-tabla tbody tr:hover { background: rgba(255,255,255,.04); }
+.rk-humanos { color: #5bc8f5; background: rgba(91,200,245,.08); border-bottom: 2px solid rgba(91,200,245,.4) !important; }
+.rk-ia      { color: #b48aff; background: rgba(180,138,255,.08); border-bottom: 2px solid rgba(180,138,255,.4) !important; }
+.rk-sub {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--texto-tenue);
+  background: var(--topbar);
+  padding: 4px 8px;
+}
+/* Separador vertical */
+.rk-sep { width: 2px; padding: 0; background: var(--atril-borde); }
+/* Columna posición y nombre */
+.rk-pos  { width: 42px; font-size: 18px; background: var(--topbar); }
+.rk-nombre { text-align: left; padding-left: 12px; background: var(--topbar); font-size: 12px; letter-spacing: .5px; text-transform: uppercase; color: var(--texto-tenue); }
+/* Celdas de datos */
+.rk-num  { font-family: monospace; font-size: 14px; }
+.rk-pct  { font-family: monospace; font-size: 14px; }
+.rk-vacio { opacity: .35; font-size: 13px; }
+/* Filas */
+.ranking-tabla tbody tr { background: var(--bg-input); transition: background .15s; }
+.ranking-tabla tbody tr:hover { background: rgba(255,255,255,.05); }
+.ranking-tabla tbody tr:last-child td { border-bottom: none; }
+/* Podio */
+.rk-top-1 { background: rgba(255,215,0,.07); }
+.rk-top-2 { background: rgba(192,192,192,.06); }
+.rk-top-3 { background: rgba(205,127,50,.06); }
+.rk-top-1 .rk-nombre strong,
+.rk-top-2 .rk-nombre strong,
+.rk-top-3 .rk-nombre strong { color: var(--texto); }
+.rk-num { font-size: 14px; }
 
 /* ===== Responsive (móvil) ===== */
 @media (max-width: 700px) {

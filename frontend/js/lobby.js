@@ -103,31 +103,37 @@ function renderRanking(ranking) {
     rankingContenido.innerHTML = `<p style="text-align:center;opacity:.7;">Todavía no hay partidas registradas.<br>¡Sé el primero!</p>`;
     return;
   }
-  let html = `<table class="ranking-tabla"><thead>
+  let html = `<table class="ranking-tabla">
+  <thead>
     <tr>
-      <th rowspan="2">#</th>
-      <th rowspan="2">Jugador</th>
-      <th colspan="3" style="text-align:center;border-bottom:1px solid var(--atril-borde)">👤 Humanos</th>
-      <th colspan="3" style="text-align:center;border-bottom:1px solid var(--atril-borde)">🤖 IA</th>
+      <th rowspan="2" class="rk-pos">#</th>
+      <th rowspan="2" class="rk-nombre">Jugador</th>
+      <th colspan="3" class="rk-grupo-header rk-humanos">👤 Humanos</th>
+      <th class="rk-sep" rowspan="2"></th>
+      <th colspan="3" class="rk-grupo-header rk-ia">🤖 IA</th>
     </tr>
     <tr>
-      <th>P</th><th>V</th><th>%</th>
-      <th>P</th><th>V</th><th>%</th>
+      <th class="rk-sub">Partidas</th><th class="rk-sub">Victorias</th><th class="rk-sub rk-pct">%</th>
+      <th class="rk-sub">Partidas</th><th class="rk-sub">Victorias</th><th class="rk-sub rk-pct">%</th>
     </tr>
   </thead><tbody>`;
   ranking.forEach((j, i) => {
-    const medalla = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (i + 1);
-    const ph  = j.partidas_humano  || 0;
-    const vh  = j.victorias_humano || 0;
-    const pch = ph ? j.porcentaje_humano : "—";
-    const pia = j.partidas_ia  || 0;
-    const via = j.victorias_ia || 0;
-    const pcia = pia ? j.porcentaje_ia : "—";
-    html += `<tr>
-      <td>${medalla}</td>
-      <td><strong>${escapar(j.nombre)}</strong></td>
-      <td>${ph}</td><td>${vh}</td><td>${ph ? pch + "%" : "—"}</td>
-      <td>${pia}</td><td>${via}</td><td>${pia ? pcia + "%" : "—"}</td>
+    const medalla = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `<span class="rk-num">${i+1}</span>`;
+    const ph  = j.partidas_humano  || 0, vh  = j.victorias_humano || 0;
+    const pia = j.partidas_ia      || 0, via = j.victorias_ia     || 0;
+    const pch  = ph  ? `<strong>${j.porcentaje_humano}%</strong>` : '<span class="rk-vacio">—</span>';
+    const pcia = pia ? `<strong>${j.porcentaje_ia}%</strong>`     : '<span class="rk-vacio">—</span>';
+    const classRow = i < 3 ? `rk-top-${i+1}` : "";
+    html += `<tr class="${classRow}">
+      <td class="rk-pos">${medalla}</td>
+      <td class="rk-nombre"><strong>${escapar(j.nombre)}</strong></td>
+      <td class="rk-num">${ph || '<span class="rk-vacio">—</span>'}</td>
+      <td class="rk-num">${vh || '<span class="rk-vacio">—</span>'}</td>
+      <td class="rk-pct">${pch}</td>
+      <td class="rk-sep"></td>
+      <td class="rk-num">${pia || '<span class="rk-vacio">—</span>'}</td>
+      <td class="rk-num">${via || '<span class="rk-vacio">—</span>'}</td>
+      <td class="rk-pct">${pcia}</td>
     </tr>`;
   });
   html += `</tbody></table>`;
