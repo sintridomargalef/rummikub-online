@@ -3,200 +3,331 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Rummikub Admin</title>
+  <title>Rummikub · Admin</title>
   <link rel="stylesheet" href="/static/css/style.css">
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body.admin {
-      display: block;
-      padding: 20px;
-      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #0b0e14;
+      color: #e0e4ea;
+      font-family: 'Inter', -apple-system, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
     }
-    .admin-header {
+    .admin-topbar {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      background: #11161e;
+      border-bottom: 1px solid #1f2833;
+    }
+    .admin-topbar h1 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #6c8cff;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .admin-topbar h1 span { color: #8899bb; font-weight: 400; }
+    .admin-topbar .topbar-info {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 13px;
+      color: #7a8ba3;
+    }
+    .admin-topbar .topbar-info a {
+      color: #6c8cff;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .admin-topbar .topbar-info a:hover { color: #8aa4ff; }
+    .admin-main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 28px;
+    }
+    .url-card {
+      background: linear-gradient(135deg, #141b26, #1a2332);
+      border: 1px solid #1f2a3a;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       flex-wrap: wrap;
       gap: 12px;
-      margin-bottom: 20px;
-      padding-bottom: 12px;
-      border-bottom: 2px solid var(--atril-borde);
     }
-    .admin-header h1 { margin: 0; color: var(--acento); }
-    .metricas {
+    .url-card .url-label { font-size: 12px; color: #6a7b95; letter-spacing: 0.5px; }
+    .url-card .url-value {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 14px;
+      color: #6c8cff;
+      font-weight: 600;
+    }
+    .url-card .url-value small { color: #4a5b75; font-weight: 400; }
+    .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 10px;
-      margin-bottom: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
     }
-    .metric {
-      background: var(--bg-2);
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid var(--atril-borde);
+    .stat-card {
+      background: #11161e;
+      border: 1px solid #1f2833;
+      border-radius: 10px;
+      padding: 16px 18px;
+      transition: border-color 0.2s;
     }
-    .metric-label {
+    .stat-card:hover { border-color: #2a3648; }
+    .stat-card .stat-label {
       font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--texto-tenue);
+      letter-spacing: 0.8px;
+      color: #5a6b85;
+      margin-bottom: 6px;
     }
-    .metric-value {
-      font-size: 22px;
-      font-weight: 800;
-      color: var(--acento);
-      margin-top: 4px;
+    .stat-card .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #c8d0e0;
+      line-height: 1.1;
+    }
+    .stat-card .stat-value.accent { color: #6c8cff; }
+    .stat-card .stat-value.green { color: #34d399; }
+    .stat-card .stat-value.amber { color: #f59e0b; }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .toolbar button, .toolbar label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: #1e2a3a;
+      color: #b0c4e8;
+      border: 1px solid #2a3648 !important;
+    }
+    .btn-primary:hover { background: #263344; border-color: #3a4a60 !important; color: #d0e0ff; }
+    .btn-danger {
+      background: #3a1a1a;
+      color: #f87171;
+      border: 1px solid #4a2828 !important;
+    }
+    .btn-danger:hover { background: #4a2222; border-color: #6a3838 !important; color: #fc9999; }
+    .toolbar label {
+      background: #11161e;
+      color: #7a8ba3;
+      border: 1px solid #1f2833;
+      cursor: pointer;
+      padding: 8px 14px;
+      font-size: 12px;
+    }
+    .toolbar input[type=checkbox] { accent-color: #6c8cff; margin-right: 4px; }
+    .section-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #4a5b75;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #1a2332;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      background: var(--bg-2);
+      background: #11161e;
       border-radius: 8px;
       overflow: hidden;
-      border: 1px solid var(--atril-borde);
+      border: 1px solid #1f2833;
+      margin-bottom: 32px;
     }
     th, td {
-      padding: 10px 12px;
+      padding: 10px 14px;
       text-align: left;
-      border-bottom: 1px solid var(--atril-borde);
+      border-bottom: 1px solid #1a2332;
+      font-size: 13px;
     }
     th {
-      background: var(--topbar);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--texto-tenue);
-    }
-    tr:last-child td { border-bottom: none; }
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 12px;
+      background: #0d1219;
       font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #5a6b85;
       font-weight: 600;
     }
-    .badge.lobby { background: #b08a40; color: #1a1a1a; }
-    .badge.activa { background: var(--exito); color: white; }
-    .badge.final { background: #555; color: white; }
-    .badge.online { background: #2e7d32; color: white; }
-    .badge.offline { background: #555; color: #ccc; }
-    .acciones-tabla button {
-      padding: 4px 10px;
-      font-size: 12px;
-      background: var(--peligro);
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #141c28; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
     }
-    .acciones-tabla button:hover { filter: brightness(1.15); }
-    .acciones-globales {
+    .badge-lobby { background: #2a2a1a; color: #d4a84b; }
+    .badge-active { background: #0a2a1a; color: #34d399; }
+    .badge-final { background: #1a1a2a; color: #7a8ba3; }
+    .badge-on { background: #0a2a1a; color: #34d399; }
+    .badge-off { background: #1a1a24; color: #5a6b85; }
+    .td-actions button {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      background: #3a1a1a;
+      color: #f87171;
+      border: 1px solid #4a2828;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .td-actions button:hover { background: #4a2222; border-color: #6a3838; }
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: #4a5b75;
+      font-size: 14px;
+    }
+    .empty-state strong { color: #6a7b95; }
+    .ranking-section { margin-top: 8px; }
+    .rename-group {
       display: flex;
-      gap: 8px;
+      align-items: center;
+      gap: 10px;
       margin-bottom: 16px;
       flex-wrap: wrap;
     }
-    .acciones-globales button { background: var(--peligro); }
-    .vacio {
-      text-align: center;
-      padding: 40px;
-      color: var(--texto-tenue);
+    .rename-group input {
+      background: #0d1219;
+      color: #c8d0e0;
+      border: 1px solid #1f2833;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
     }
-    .info-text {
-      font-size: 12px;
-      color: var(--texto-tenue);
-      margin-top: 4px;
+    .rename-group input:focus { border-color: #3a4a60; }
+    .rename-group input::placeholder { color: #3a4a60; }
+    .rename-group span { color: #4a5b75; font-size: 14px; }
+    .medal { font-weight: 700; }
+    .medal-1 { color: #f59e0b; }
+    .medal-2 { color: #9ca3af; }
+    .medal-3 { color: #cd7f32; }
+    @media (max-width: 700px) {
+      .admin-main { padding: 16px; }
+      .admin-topbar { flex-direction: column; gap: 8px; align-items: flex-start; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
     }
-    .ip-banner {
-      background: var(--bg-2);
-      border: 1px dashed var(--acento);
-      border-radius: 8px;
-      padding: 12px 16px;
-      margin-bottom: 20px;
-      font-family: monospace;
-    }
-    .ip-banner strong { color: var(--acento); }
   </style>
 </head>
-<body class="admin theme-classic">
-  <header class="admin-header">
-    <h1>Panel de administración</h1>
-    <div>
-      <span id="info-uptime" class="info-text"></span>
-      <span id="info-now" class="info-text" style="margin-left: 12px;"></span>
-      <a href="/" style="margin-left: 16px; color: var(--acento);">Volver al lobby</a>
-    </div>
-  </header>
-
-  <div class="ip-banner">
-    URL para jugar: <strong id="url-publica">http://<tu-IP-pública></strong>
-    <div class="info-text">Comparte esta URL con María y demás parejas. Si el servidor está en LAN, también: <strong id="url-lan">http://192.168.1.40</strong></div>
-  </div>
-
-  <div class="metricas">
-    <div class="metric">
-      <div class="metric-label">Salas totales</div>
-      <div class="metric-value" id="m-total">0</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">Partidas en curso</div>
-      <div class="metric-value" id="m-activas">0</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">Refrescos</div>
-      <div class="metric-value" id="m-refrescos">0</div>
+<body class="admin">
+  <div class="admin-topbar">
+    <h1>◈ Rummikub <span>· Panel de administración</span></h1>
+    <div class="topbar-info">
+      <span id="info-uptime"></span>
+      <span id="info-now"></span>
+      <a href="/admin">⟳</a>
+      <a href="/">← Volver al lobby</a>
     </div>
   </div>
 
-  <div class="acciones-globales">
-    <button id="btn-refresh">↻ Refrescar</button>
-    <button id="btn-cerrar-todas">🗑 Cerrar todas las salas</button>
-    <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
-      <input type="checkbox" id="chk-auto" checked>
-      Auto-refresco cada 5 s
-    </label>
+  <div class="admin-main">
+    <div class="url-card">
+      <div>
+        <div class="url-label">URL para jugar</div>
+        <div class="url-value" id="url-publica">cargando...</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="url-label">LAN</div>
+        <div class="url-value"><small id="url-lan">cargando...</small></div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Salas totales</div>
+        <div class="stat-value accent" id="m-total">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Partidas en curso</div>
+        <div class="stat-value green" id="m-activas">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Uptime</div>
+        <div class="stat-value amber" id="m-uptime">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Refrescos</div>
+        <div class="stat-value" id="m-refrescos" style="font-size:22px;">0</div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn-primary" id="btn-refresh">↻ Refrescar</button>
+      <button class="btn-danger" id="btn-cerrar-todas">✕ Cerrar todas las salas</button>
+      <label><input type="checkbox" id="chk-auto" checked> Auto 5s</label>
+    </div>
+
+    <div class="section-title">Salas activas</div>
+    <table id="tabla-salas">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Estado</th>
+          <th>Jugadores</th>
+          <th>Turno</th>
+          <th>Mesa / Mazo</th>
+          <th>Creada</th>
+          <th>Última acción</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="filas"></tbody>
+    </table>
+    <div id="vacio" class="empty-state">No hay salas activas ahora mismo.</div>
+
+    <div class="ranking-section">
+      <div class="section-title">🏆 Ranking de jugadores</div>
+      <div class="rename-group">
+        <input id="rk-viejo" type="text" placeholder="Nombre actual">
+        <span>→</span>
+        <input id="rk-nuevo" type="text" placeholder="Nombre nuevo (fusiona)">
+        <button class="btn-primary" id="btn-renombrar" style="padding:8px 14px;">Renombrar</button>
+        <button class="btn-danger" id="btn-reset-ranking" style="margin-left:auto;">✕ Reset ranking</button>
+      </div>
+    </div>
+    <table id="tabla-ranking">
+      <thead>
+        <tr>
+          <th rowspan="2">#</th>
+          <th rowspan="2">Jugador</th>
+          <th colspan="3" style="text-align:center;border-bottom:1px solid #444">👤 Humanos</th>
+          <th colspan="3" style="text-align:center;border-bottom:1px solid #444">🤖 IA</th>
+          <th rowspan="2">Última</th>
+        </tr>
+        <tr><th>P</th><th>V</th><th>%</th><th>P</th><th>V</th><th>%</th></tr>
+      </thead>
+      <tbody id="filas-ranking"></tbody>
+    </table>
+    <div id="vacio-ranking" class="empty-state">Todavía no hay partidas registradas.</div>
   </div>
-
-  <table id="tabla-salas">
-    <thead>
-      <tr>
-        <th>Código</th>
-        <th>Estado</th>
-        <th>Jugadores</th>
-        <th>Turno</th>
-        <th>Mesa / Mazo</th>
-        <th>Creada</th>
-        <th>Última acción</th>
-        <th>Acciones</th>
-      </tr>
-    </thead>
-    <tbody id="filas"></tbody>
-  </table>
-
-  <div id="vacio" class="vacio hidden">No hay salas activas ahora mismo.</div>
-
-  <h2 style="margin: 28px 0 12px; color: var(--acento);">🏆 Ranking de jugadores</h2>
-
-  <div class="acciones-globales" style="gap:10px;">
-    <input id="rk-viejo" type="text" placeholder="Nombre actual" maxlength="40"
-           style="background:var(--bg-input); color:var(--texto); border:1px solid var(--atril-borde); padding:6px 10px; border-radius:4px; width:180px;">
-    <span style="opacity:.6;">→</span>
-    <input id="rk-nuevo" type="text" placeholder="Nombre nuevo (fusiona si existe)" maxlength="40"
-           style="background:var(--bg-input); color:var(--texto); border:1px solid var(--atril-borde); padding:6px 10px; border-radius:4px; width:220px;">
-    <button id="btn-renombrar" style="background:var(--primario);">Renombrar / Fusionar</button>
-    <button id="btn-reset-ranking" style="background:var(--peligro); margin-left:auto;">🗑 Reset total</button>
-  </div>
-
-  <table id="tabla-ranking">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Jugador</th>
-        <th>Partidas</th>
-        <th>Victorias</th>
-        <th>%</th>
-        <th>Última partida</th>
-      </tr>
-    </thead>
-    <tbody id="filas-ranking"></tbody>
-  </table>
-
-  <div id="vacio-ranking" class="vacio hidden">Todavía no hay partidas registradas.</div>
 
   <script>
     let refrescos = 0;
@@ -205,16 +336,14 @@
       if (segs == null || isNaN(segs)) return "—";
       segs = Math.max(0, Math.floor(segs));
       if (segs < 60) return `${segs} s`;
-      const m = Math.floor(segs / 60);
-      const s = segs % 60;
+      const m = Math.floor(segs / 60), s = segs % 60;
       if (m < 60) return `${m}m ${s}s`;
       const h = Math.floor(m / 60);
       return `${h}h ${m % 60}m`;
     };
     const fmtHora = (ts) => {
       if (!ts) return "—";
-      const d = new Date(ts * 1000);
-      return d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      return new Date(ts * 1000).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     };
 
     async function refrescar() {
@@ -225,65 +354,54 @@
         renderizar(data);
         refrescos++;
         $("m-refrescos").textContent = refrescos;
-      } catch (e) {
-        console.error(e);
-      }
+      } catch (e) { console.error(e); }
     }
 
     function renderizar(data) {
       $("m-total").textContent = data.total_salas;
       $("m-activas").textContent = data.salas_activas;
+      $("m-uptime").textContent = fmtDuracion(data.uptime);
       $("info-uptime").textContent = `Uptime: ${fmtDuracion(data.uptime)}`;
-      $("info-now").textContent = `Hora servidor: ${fmtHora(data.ahora)}`;
-
+      $("info-now").textContent = fmtHora(data.ahora);
       const tbody = $("filas");
       tbody.innerHTML = "";
       if (!data.salas.length) {
-        $("vacio").classList.remove("hidden");
+        $("vacio").style.display = "";
         $("tabla-salas").style.display = "none";
         return;
       }
-      $("vacio").classList.add("hidden");
+      $("vacio").style.display = "none";
       $("tabla-salas").style.display = "";
-
       for (const s of data.salas) {
         const tr = document.createElement("tr");
-        let estadoBadge;
-        if (s.ganador) estadoBadge = `<span class="badge final">Finalizada · ganó ${s.ganador}</span>`;
-        else if (s.partida_iniciada) estadoBadge = `<span class="badge activa">En curso</span>`;
-        else estadoBadge = `<span class="badge lobby">Lobby</span>`;
-
-        const jugadores = s.jugadores.map(j => {
-          const conn = j.conectado ? `<span class="badge online">on</span>` : `<span class="badge offline">off</span>`;
-          const fichas = s.partida_iniciada ? ` · ${j.fichas} fichas` : "";
-          return `${j.nombre} ${conn}${fichas}`;
-        }).join("<br>") || "<i>vacía</i>";
-
-        const mesa = s.partida_iniciada ? `${s.combinaciones_mesa} combos · mazo ${s.mazo_restante}` : "—";
-        const turno = s.turno || "—";
-
+        let badge;
+        if (s.ganador) badge = `<span class="badge badge-final">Finalizada · ${s.ganador}</span>`;
+        else if (s.partida_iniciada) badge = `<span class="badge badge-active">En curso</span>`;
+        else badge = `<span class="badge badge-lobby">Lobby</span>`;
+        const jugs = s.jugadores.map(j => {
+          const conn = j.conectado ? `<span class="badge badge-on">●</span>` : `<span class="badge badge-off">○</span>`;
+          const f = s.partida_iniciada ? ` · ${j.fichas} f` : "";
+          return `${j.nombre} ${conn}${f}`;
+        }).join("<br>") || "<i style='color:#4a5b75;'>vacía</i>";
         tr.innerHTML = `
-          <td><strong>${s.codigo}</strong></td>
-          <td>${estadoBadge}</td>
-          <td>${jugadores}</td>
-          <td>${turno}</td>
-          <td>${mesa}</td>
-          <td>${fmtHora(s.creada)}<div class="info-text">hace ${fmtDuracion((data.ahora - s.creada))}</div></td>
-          <td>${fmtHora(s.ultima_accion)}<div class="info-text">hace ${fmtDuracion((data.ahora - s.ultima_accion))}</div></td>
-          <td class="acciones-tabla"><button data-codigo="${s.codigo}">Cerrar</button></td>
+          <td><strong style="color:#6c8cff;">${s.codigo}</strong></td>
+          <td>${badge}</td>
+          <td>${jugs}</td>
+          <td>${s.turno || "—"}</td>
+          <td>${s.partida_iniciada ? `${s.combinaciones_mesa} combos · ${s.mazo_restante} mazo` : "—"}</td>
+          <td>${fmtHora(s.creada)}<br><small style="color:#4a5b75;font-size:11px;">hace ${fmtDuracion(data.ahora - s.creada)}</small></td>
+          <td>${fmtHora(s.ultima_accion)}<br><small style="color:#4a5b75;font-size:11px;">hace ${fmtDuracion(data.ahora - s.ultima_accion)}</small></td>
+          <td class="td-actions"><button data-c="${s.codigo}">✕</button></td>
         `;
         tbody.appendChild(tr);
       }
-      tbody.querySelectorAll("button[data-codigo]").forEach(btn => {
-        btn.addEventListener("click", () => cerrarSala(btn.dataset.codigo));
-      });
+      tbody.querySelectorAll("button[data-c]").forEach(b => b.addEventListener("click", () => cerrar(b.dataset.c)));
     }
 
-    async function cerrarSala(codigo) {
-      if (!confirm(`¿Cerrar la sala ${codigo} y echar a los jugadores?`)) return;
-      const r = await fetch(`/api/admin/cerrar/${codigo}`, { method: "POST", credentials: "include" });
-      if (r.ok) refrescar();
-      else alert("Error: " + r.status);
+    async function cerrar(c) {
+      if (!confirm(`¿Cerrar sala ${c}?`)) return;
+      const r = await fetch(`/api/admin/cerrar/${c}`, { method: "POST", credentials: "include" });
+      if (r.ok) refrescar(); else alert("Error " + r.status);
     }
 
     $("btn-cerrar-todas").addEventListener("click", async () => {
@@ -291,15 +409,17 @@
       const r = await fetch("/api/admin/cerrar-todas", { method: "POST", credentials: "include" });
       if (r.ok) refrescar();
     });
-
     $("btn-refresh").addEventListener("click", refrescar);
 
-    // URLs visibles: el juego corre en :80 (sin puerto), el admin en :8080
-    const hostJuego = location.hostname === "localhost" ? "192.168.1.40" : location.hostname;
-    $("url-lan").textContent = `http://${hostJuego}`;
-    $("url-publica").textContent = `http://<tu-IP-pública>`;
+    const host = location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") {
+      $("url-publica").innerHTML = `<a href="http://83.45.142.16" target="_blank" style="color:6c8cff;">http://83.45.142.16</a> <small style="margin-left:8px;">(IP pública)</small>`;
+      $("url-lan").textContent = "http://192.168.1.35";
+    } else {
+      $("url-publica").textContent = location.origin;
+      $("url-lan").textContent = `http://${host}`;
+    }
 
-    // Auto-refresco
     let timer = null;
     function arrancarAuto() {
       if (timer) clearInterval(timer);
@@ -309,82 +429,51 @@
     arrancarAuto();
     refrescar();
 
-    // ===== Ranking =====
-    function escapar(s) {
-      return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-    }
-
+    function esc(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
     async function cargarRanking() {
       try {
         const r = await fetch("/api/admin/ranking");
         if (!r.ok) throw new Error("HTTP " + r.status);
         const data = await r.json();
         renderRanking(data.ranking);
-      } catch (e) {
-        console.error(e);
-      }
+      } catch (e) { console.error(e); }
     }
-
-    function renderRanking(ranking) {
+    function renderRanking(rk) {
       const tbody = $("filas-ranking");
-      const vacio = $("vacio-ranking");
       tbody.innerHTML = "";
-      if (!ranking || ranking.length === 0) {
-        vacio.classList.remove("hidden");
-        $("tabla-ranking").style.display = "none";
-        return;
-      }
-      vacio.classList.add("hidden");
+      if (!rk || !rk.length) { $("vacio-ranking").style.display = ""; $("tabla-ranking").style.display = "none"; return; }
+      $("vacio-ranking").style.display = "none";
       $("tabla-ranking").style.display = "";
-      ranking.forEach((j, i) => {
-        const medalla = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (i + 1);
-        const ultima = j.ultima_partida ? new Date(j.ultima_partida * 1000).toLocaleDateString("es-ES") + " " + new Date(j.ultima_partida * 1000).toLocaleTimeString("es-ES", {hour:"2-digit", minute:"2-digit"}) : "—";
+      rk.forEach((j, i) => {
+        const icon = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (i + 1);
+        const ult = j.ultima_partida ? new Date(j.ultima_partida*1000).toLocaleDateString("es-ES") : "—";
+        const ph  = j.partidas_humano  || 0, vh  = j.victorias_humano || 0;
+        const pia = j.partidas_ia      || 0, via = j.victorias_ia     || 0;
+        const pch  = ph  ? (j.porcentaje_humano  + "%") : "—";
+        const pcia = pia ? (j.porcentaje_ia       + "%") : "—";
         const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${medalla}</td>
-          <td><strong>${escapar(j.nombre)}</strong></td>
-          <td>${j.partidas}</td>
-          <td>${j.victorias}</td>
-          <td>${j.porcentaje}%</td>
-          <td>${ultima}</td>
-        `;
+        tr.innerHTML = `<td>${icon}</td><td><strong>${esc(j.nombre)}</strong></td>
+          <td>${ph}</td><td>${vh}</td><td>${pch}</td>
+          <td>${pia}</td><td>${via}</td><td>${pcia}</td>
+          <td>${ult}</td>`;
         tbody.appendChild(tr);
       });
     }
-
     $("btn-renombrar").addEventListener("click", async () => {
-      const viejo = $("rk-viejo").value.trim();
-      const nuevo = $("rk-nuevo").value.trim();
-      if (!viejo || !nuevo) { alert("Rellena ambos nombres"); return; }
-      if (viejo === nuevo) { alert("Son el mismo nombre"); return; }
-      try {
-        const r = await fetch("/api/admin/ranking/renombrar", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ viejo, nuevo })
-        });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.detail || "Error");
-        $("rk-viejo").value = "";
-        $("rk-nuevo").value = "";
-        cargarRanking();
-      } catch (e) {
-        alert("Error: " + e.message);
-      }
+      const v = $("rk-viejo").value.trim(), n = $("rk-nuevo").value.trim();
+      if (!v || !n) { alert("Rellena ambos nombres"); return; }
+      if (v === n) { alert("Son el mismo nombre"); return; }
+      const r = await fetch("/api/admin/ranking/renombrar", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({viejo:v, nuevo:n}) });
+      const data = await r.json();
+      if (!r.ok) alert("Error: " + (data.detail || r.status));
+      else { $("rk-viejo").value = ""; $("rk-nuevo").value = ""; cargarRanking(); }
     });
-
     $("btn-reset-ranking").addEventListener("click", async () => {
-      if (!confirm("¿Borrar TODO el ranking? Esta acción es irreversible.")) return;
+      if (!confirm("¿Borrar TODO el ranking?")) return;
       if (!confirm("¿De verdad? Se perderán todas las estadísticas.")) return;
-      try {
-        const r = await fetch("/api/admin/ranking/reset", { method: "POST" });
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        cargarRanking();
-      } catch (e) {
-        alert("Error: " + e.message);
-      }
+      const r = await fetch("/api/admin/ranking/reset", { method: "POST" });
+      if (r.ok) cargarRanking();
     });
-
     cargarRanking();
   </script>
 </body>

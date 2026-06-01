@@ -103,17 +103,31 @@ function renderRanking(ranking) {
     rankingContenido.innerHTML = `<p style="text-align:center;opacity:.7;">Todavía no hay partidas registradas.<br>¡Sé el primero!</p>`;
     return;
   }
-  let html = `<table class="ranking-tabla"><thead><tr>
-    <th>#</th><th>Jugador</th><th>Partidas</th><th>Victorias</th><th>%</th>
-  </tr></thead><tbody>`;
+  let html = `<table class="ranking-tabla"><thead>
+    <tr>
+      <th rowspan="2">#</th>
+      <th rowspan="2">Jugador</th>
+      <th colspan="3" style="text-align:center;border-bottom:1px solid var(--atril-borde)">👤 Humanos</th>
+      <th colspan="3" style="text-align:center;border-bottom:1px solid var(--atril-borde)">🤖 IA</th>
+    </tr>
+    <tr>
+      <th>P</th><th>V</th><th>%</th>
+      <th>P</th><th>V</th><th>%</th>
+    </tr>
+  </thead><tbody>`;
   ranking.forEach((j, i) => {
     const medalla = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (i + 1);
+    const ph  = j.partidas_humano  || 0;
+    const vh  = j.victorias_humano || 0;
+    const pch = ph ? j.porcentaje_humano : "—";
+    const pia = j.partidas_ia  || 0;
+    const via = j.victorias_ia || 0;
+    const pcia = pia ? j.porcentaje_ia : "—";
     html += `<tr>
       <td>${medalla}</td>
       <td><strong>${escapar(j.nombre)}</strong></td>
-      <td>${j.partidas}</td>
-      <td>${j.victorias}</td>
-      <td>${j.porcentaje}%</td>
+      <td>${ph}</td><td>${vh}</td><td>${ph ? pch + "%" : "—"}</td>
+      <td>${pia}</td><td>${via}</td><td>${pia ? pcia + "%" : "—"}</td>
     </tr>`;
   });
   html += `</tbody></table>`;
