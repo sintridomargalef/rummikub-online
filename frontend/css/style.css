@@ -747,12 +747,22 @@ body.game {
   font-family: var(--titulo-font);
 }
 .ficha:active { cursor: grabbing; }
-.ficha.dragging { opacity: .3; }
+.ficha.dragging { opacity: .25; }
+/* Ghost mejorado: elevado, inclinado, sombra dramática */
 .ficha.ghost {
   pointer-events: none;
-  box-shadow: 0 4px 14px rgba(0,0,0,.5);
-  transform: scale(1.05);
+  transform: scale(1.18) rotate(3deg) !important;
+  box-shadow: 0 18px 36px rgba(0,0,0,.55), 0 6px 12px rgba(0,0,0,.35) !important;
+  filter: brightness(1.08);
+  opacity: 0.92 !important;
 }
+/* Micro-bounce al coger la ficha */
+@keyframes ficha-pickup {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.07); }
+  100% { transform: scale(1); }
+}
+.ficha.pickup { animation: ficha-pickup 0.09s ease-out; }
 
 /* Pie discreto con la versión del programa (lobby) */
 .version-footer {
@@ -860,24 +870,12 @@ body.theme-cyberpunk .acciones-laterales .lateral-secundario {
 /* Animación de "drop" — para fichas que aparecen en la MESA. Sin giro,
    solo un pop con escala + sombra que cae. Más sutil para no marear. */
 @keyframes ficha-drop {
-  0% {
-    transform: scale(0.6) translateY(-12px);
-    opacity: 0;
-    box-shadow: 0 10px 16px rgba(0,0,0,.4);
-  }
-  60% {
-    transform: scale(1.12) translateY(2px);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1) translateY(0);
-    opacity: 1;
-    box-shadow: var(--tile-sombra);
-  }
+  0%   { transform: scale(0.45) translateY(-8px); opacity: 0; filter: brightness(1.4); }
+  55%  { transform: scale(1.12) translateY(3px);  opacity: 1; filter: brightness(1.1); }
+  80%  { transform: scale(0.96) translateY(0);    opacity: 1; filter: brightness(1);   }
+  100% { transform: scale(1)    translateY(0);    opacity: 1; }
 }
-.ficha.drop-in {
-  animation: ficha-drop 0.25s ease-out;
-}
+.ficha.drop-in { animation: ficha-drop 0.32s cubic-bezier(.2,.8,.3,1); }
 .ficha.negro { color: var(--negro); }
 .ficha.azul { color: var(--azul); text-shadow: var(--texto-shadow); }
 .ficha.rojo { color: var(--rojo); text-shadow: var(--texto-shadow); }

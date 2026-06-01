@@ -637,9 +637,14 @@ function attachPointerDrag(fichaEl, tile) {
 }
 
 function iniciarDrag(e, srcEl, tile) {
+  // Micro-bounce de arranque (pickup)
+  srcEl.classList.add("pickup");
+  setTimeout(() => srcEl.classList.remove("pickup"), 90);
+
   const rect = srcEl.getBoundingClientRect();
   const ghost = srcEl.cloneNode(true);
   ghost.classList.add("ghost");
+  ghost.classList.remove("pickup");
   ghost.style.position = "fixed";
   ghost.style.left = rect.left + "px";
   ghost.style.top = rect.top + "px";
@@ -647,7 +652,6 @@ function iniciarDrag(e, srcEl, tile) {
   ghost.style.height = rect.height + "px";
   ghost.style.pointerEvents = "none";
   ghost.style.zIndex = "1000";
-  ghost.style.opacity = "0.85";
   document.body.appendChild(ghost);
   srcEl.classList.add("dragging");
 
@@ -1366,26 +1370,78 @@ function detectarCombinaciones(fichas) {
   return { grupos, escaleras, resto, jokers };
 }
 
+// ============ FLIP animation helper ============
+// Captura posiciones antes, ejecuta acción (que hace render), y anima el movimiento.
+function flipAnimar(accion) {
+  const antes = {};
+  document.querySelectorAll(".ficha[data-id]").forEach((el) => {
+    antes[el.dataset.id] = el.getBoundingClientRect();
+  });
+  accion();  // ejecuta render interno
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".ficha[data-id]").forEach((el) => {
+      const b = antes[el.dataset.id];
+      if (!b) return;
+      const a = el.getBoundingClientRect();
+      const dx = b.left - a.left, dy = b.top - a.top;
+      if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+      el.style.transition = "none";
+      el.style.transform = `translate(${dx}px,${dy}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = "transform 0.38s cubic-bezier(.2,.7,.2,1)";
+        el.style.transform = "";
+        setTimeout(() => { el.style.transition = ""; }, 400);
+      });
+    });
+  });
+}
+
 $("btn-ordenar").addEventListener("click", () => {
   guardarParaDeshacer();
-  // María prefiere ordenar por número (1→13); el resto usa detección de combinaciones.
-  const esMaria = /^mar[ií]a$/i.test((nombre || "").trim());
-  if (esMaria) {
+  flipAnimar(() => {
+    const esMaria = /^mar[ií]a$/i.test((nombre || "").trim());
+    if (esMaria) {
+      const ORDEN_COLORES = ["rojo", "azul", "negro", "amarillo"];
+      const todas = fichasEnAtril();
+      const normales = todas
+        .filter((t) => !t.is_joker)
+        .sort((a, b) => a.number !== b.number
+          ? a.number - b.number
+          : ORDEN_COLORES.indexOf(a.color) - ORDEN_COLORES.indexOf(b.color));
+      const jokers = todas.filter((t) => t.is_joker);
+      const ordenadas = [...normales, ...jokers];
+      const mitad = Math.ceil(ordenadas.length / 2);
+      colocarPorFilas(ordenadas.slice(0, mitad), ordenadas.slice(mitad));
+    } else {
+      const { grupos, escaleras, resto, jokers } = detectarCombinaciones(fichasEnAtril());
+      const bloques = [...grupos, ...escaleras, resto, jokers].filter((b) => b.length > 0);
+      const total = bloques.reduce((acc, b) => acc + b.length, 0);
+      const objetivo = total / 2;
+      let acumulado = 0, mejorCorte = 0, mejorDiff = Infinity;
+      for (let i = 0; i <= bloques.length; i++) {
+        const diff = Math.abs(acumulado - objetivo);
+        if (diff < mejorDiff) { mejorDiff = diff; mejorCorte = i; }
+        if (i < bloques.length) acumulado += bloques[i].length;
+      }
+      colocarPorFilas(bloques.slice(0, mejorCorte).flat(), bloques.slice(mejorCorte).flat());
+    }
+    render();
+  });
+});
+
+$("btn-ayuda").addEventListener("click", () => {
+  guardarParaDeshacer();
+  flipAnimar(() => {
     const ORDEN_COLORES = ["rojo", "azul", "negro", "amarillo"];
     const todas = fichasEnAtril();
-    const normales = todas
-      .filter((t) => !t.is_joker)
-      .sort((a, b) => a.number !== b.number
-        ? a.number - b.number
-        : ORDEN_COLORES.indexOf(a.color) - ORDEN_COLORES.indexOf(b.color));
+    const grupos = ORDEN_COLORES.map((color) =>
+      todas
+        .filter((t) => !t.is_joker && t.color === color)
+        .sort((a, b) => a.number - b.number)
+    );
     const jokers = todas.filter((t) => t.is_joker);
-    const ordenadas = [...normales, ...jokers];
-    const mitad = Math.ceil(ordenadas.length / 2);
-    colocarPorFilas(ordenadas.slice(0, mitad), ordenadas.slice(mitad));
-  } else {
-    const { grupos, escaleras, resto, jokers } = detectarCombinaciones(fichasEnAtril());
-    const bloques = [...grupos, ...escaleras, resto, jokers].filter((b) => b.length > 0);
-    const total = bloques.reduce((acc, b) => acc + b.length, 0);
+    const bloques = [...grupos, jokers].filter((g) => g.length > 0);
+    const total = bloques.reduce((acc, g) => acc + g.length, 0);
     const objetivo = total / 2;
     let acumulado = 0, mejorCorte = 0, mejorDiff = Infinity;
     for (let i = 0; i <= bloques.length; i++) {
@@ -1394,31 +1450,8 @@ $("btn-ordenar").addEventListener("click", () => {
       if (i < bloques.length) acumulado += bloques[i].length;
     }
     colocarPorFilas(bloques.slice(0, mejorCorte).flat(), bloques.slice(mejorCorte).flat());
-  }
-  render();
-});
-
-$("btn-ayuda").addEventListener("click", () => {
-  guardarParaDeshacer();
-  const ORDEN_COLORES = ["rojo", "azul", "negro", "amarillo"];
-  const todas = fichasEnAtril();
-  const grupos = ORDEN_COLORES.map((color) =>
-    todas
-      .filter((t) => !t.is_joker && t.color === color)
-      .sort((a, b) => a.number - b.number)
-  );
-  const jokers = todas.filter((t) => t.is_joker);
-  const bloques = [...grupos, jokers].filter((g) => g.length > 0);
-  const total = bloques.reduce((acc, g) => acc + g.length, 0);
-  const objetivo = total / 2;
-  let acumulado = 0, mejorCorte = 0, mejorDiff = Infinity;
-  for (let i = 0; i <= bloques.length; i++) {
-    const diff = Math.abs(acumulado - objetivo);
-    if (diff < mejorDiff) { mejorDiff = diff; mejorCorte = i; }
-    if (i < bloques.length) acumulado += bloques[i].length;
-  }
-  colocarPorFilas(bloques.slice(0, mejorCorte).flat(), bloques.slice(mejorCorte).flat());
-  render();
+    render();
+  });
 });
 
 $("overlay-cerrar").addEventListener("click", () => overlay.classList.add("hidden"));
@@ -1512,6 +1545,7 @@ const sock = new RKSocket(codigo, nombre, {
     $("btn-menu").classList.remove("hidden");
     sonidoVictoria();
     decir(data.ganador === yo ? t("Has ganado") : t("Ha ganado {0}", data.ganador));
+    if (data.ganador === yo && typeof lanzarConfeti === "function") lanzarConfeti();
   },
 });
 sock.conectar();
