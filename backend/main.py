@@ -61,6 +61,16 @@ FRONTEND = ROOT / "frontend"
 
 INICIO_SERVER = time.time()
 
+# Hash del commit actual para cache-busting de estáticos
+import subprocess as _sp
+try:
+    _VER = _sp.run(["git", "rev-parse", "--short", "HEAD"],
+                   capture_output=True, text=True, cwd=str(ROOT), timeout=3).stdout.strip()
+    if not _VER:
+        _VER = str(int(INICIO_SERVER))
+except Exception:
+    _VER = str(int(INICIO_SERVER))
+
 app = FastAPI(title="Rummikub Online")
 
 
@@ -203,7 +213,7 @@ async def _ejecutar_turno_ia(sala) -> None:
         sala.finalizada = time.time()
         memoria.registrar_resultado(sala.estado.ganador == NOMBRE_IA)
         try:
-            stats.registrar_partida(sala.jugadores, sala.estado.ganador)
+            stats.registrar_partida(sala.jugadores, sala.estado.ganador, contra_ia=True)
         except Exception:
             pass
         for n, ws in list(sala.sockets.items()):
@@ -331,7 +341,8 @@ async def ws_juego(websocket: WebSocket, codigo: str, nombre: str):
                         if sala.reglas.get("contra_ia"):
                             memoria.registrar_resultado(sala.estado.ganador == NOMBRE_IA)
                         try:
-                            stats.registrar_partida(sala.jugadores, sala.estado.ganador)
+                            stats.registrar_partida(sala.jugadores, sala.estado.ganador,
+                                                    contra_ia=bool(sala.reglas.get("contra_ia")))
                         except Exception:
                             pass
                         for n, ws in list(sala.sockets.items()):
@@ -551,7 +562,6 @@ if FRONTEND.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND)), name="static")
 
     _NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
-    _GAME_VER = "20260523d"
 
     @app.get("/")
     async def root_index():
@@ -560,10 +570,10 @@ if FRONTEND.exists():
     @app.get("/game")
     async def game_page(request: Request):
         from urllib.parse import urlencode
+        from fastapi.responses import RedirectResponse
         params = dict(request.query_params)
-        if params.get("_v") != _GAME_VER:
-            params["_v"] = _GAME_VER
-            from fastapi.responses import RedirectResponse
+        if params.get("_v") != _VER:
+            params["_v"] = _VER
             return RedirectResponse(f"/game?{urlencode(params)}", status_code=302)
         return FileResponse(str(FRONTEND / "game.html"), headers=_NO_CACHE)
 
