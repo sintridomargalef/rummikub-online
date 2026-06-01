@@ -16,10 +16,10 @@
   const chatForm = $("chat-form");
   const chatInput = $("chat-input");
 
-  let panelVisible = (() => {
-    try { return localStorage.getItem("rk_panel_comm") !== "off"; } catch (_) { return true; }
-  })();
-  panel.classList.toggle("hidden", !panelVisible);
+  // El panel siempre empieza cerrado al entrar a la partida.
+  // El localStorage solo recuerda la preferencia para dentro de la misma sesión.
+  let panelVisible = false;
+  panel.classList.add("hidden");
 
   btnChat.addEventListener("click", () => {
     panelVisible = !panelVisible;
@@ -27,11 +27,67 @@
     try { localStorage.setItem("rk_panel_comm", panelVisible ? "on" : "off"); } catch (_) {}
   });
 
+  function abrirPanel() {
+    if (panelVisible) return;
+    panelVisible = true;
+    panel.classList.remove("hidden");
+    try { localStorage.setItem("rk_panel_comm", "on"); } catch (_) {}
+  }
+
+  // ====== Arrastrar el panel ======
+  (function habilitarArrastre() {
+    const handle = $("panel-comm-handle");
+    if (!handle) return;
+
+    // Restaurar posición guardada
+    try {
+      const pos = JSON.parse(localStorage.getItem("rk_panel_pos") || "null");
+      if (pos && typeof pos.x === "number" && typeof pos.y === "number") {
+        panel.style.left = pos.x + "px";
+        panel.style.top = pos.y + "px";
+        panel.style.right = "auto";
+      }
+    } catch (_) {}
+
+    let dragging = false, offX = 0, offY = 0;
+
+    handle.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      const r = panel.getBoundingClientRect();
+      offX = e.clientX - r.left;
+      offY = e.clientY - r.top;
+      panel.style.right = "auto";
+      handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      let x = e.clientX - offX;
+      let y = e.clientY - offY;
+      x = Math.max(0, Math.min(x, window.innerWidth - panel.offsetWidth));
+      y = Math.max(0, Math.min(y, window.innerHeight - 40));
+      panel.style.left = x + "px";
+      panel.style.top = y + "px";
+    });
+    const finArrastre = () => {
+      if (!dragging) return;
+      dragging = false;
+      try {
+        localStorage.setItem("rk_panel_pos",
+          JSON.stringify({ x: panel.offsetLeft, y: panel.offsetTop }));
+      } catch (_) {}
+    };
+    handle.addEventListener("pointerup", finArrastre);
+    handle.addEventListener("pointercancel", finArrastre);
+  })();
+
   // ====== WebRTC ======
   const ICE_CONFIG = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
     ],
   };
 
@@ -39,6 +95,17 @@
   let localStream = null; // MediaStream
   let camOn = false;
   let micOn = false;
+
+  // Perfect negotiation state
+  let makingOffer = false;
+  let ignoreOffer = false;
+  let polite = null; // se determina al saber el nombre del rival
+  let pendingIce = []; // ICE candidates llegados antes del setRemoteDescription
+
+  function asegurarRol(remoteName) {
+    if (polite !== null || !remoteName) return;
+    polite = String(window.nombre || "").toLowerCase() < String(remoteName).toLowerCase();
+  }
 
   function esperarSock() {
     return new Promise((res) => {
@@ -62,6 +129,19 @@
       // Ajustar tracks existentes
       localStream.getVideoTracks().forEach(t => t.enabled = necesitaVideo);
       localStream.getAudioTracks().forEach(t => t.enabled = necesitaAudio);
+
+      // Si necesitamos audio pero el stream no tiene tracks de audio, pedirlo ahora
+      if (necesitaAudio && localStream.getAudioTracks().length === 0) {
+        const extra = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        extra.getAudioTracks().forEach(t => localStream.addTrack(t));
+      }
+      // Si necesitamos vídeo pero el stream no tiene tracks de vídeo, pedirlo ahora
+      if (necesitaVideo && localStream.getVideoTracks().length === 0) {
+        const extra = await navigator.mediaDevices.getUserMedia(
+          { video: { width: 320, height: 240, facingMode: "user" }, audio: false });
+        extra.getVideoTracks().forEach(t => localStream.addTrack(t));
+        videoLocal.srcObject = localStream;
+      }
       return localStream;
     }
     const constraints = {
@@ -88,6 +168,17 @@
         videoTileRemoto.classList.remove("con-stream");
       }
     };
+    pc.onnegotiationneeded = async () => {
+      try {
+        makingOffer = true;
+        await pc.setLocalDescription();
+        sock.enviar({ type: "video_offer", sdp: pc.localDescription });
+      } catch (e) {
+        console.warn("[comm] negotiationneeded error:", e);
+      } finally {
+        makingOffer = false;
+      }
+    };
     return pc;
   }
 
@@ -101,20 +192,13 @@
     });
   }
 
-  async function negociar() {
-    if (!pc) return;
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    sock.enviar({ type: "video_offer", sdp: pc.localDescription });
-  }
-
   async function activarCamara() {
     try {
+      abrirPanel();
       await obtenerLocalStream(true, micOn);
       camOn = true;
       crearPC();
-      vincularTracks();
-      await negociar();
+      vincularTracks(); // dispara onnegotiationneeded
     } catch (e) {
       mostrarToastLocal("No se pudo acceder a la cámara: " + e.message);
       camOn = false;
@@ -130,20 +214,18 @@
     camOn = false;
     actualizarBotonesAV();
     if (pc) {
-      // quitamos las pistas de vídeo del peer
       pc.getSenders().forEach(s => { if (s.track && s.track.kind === "video") pc.removeTrack(s); });
-      // renegociamos para informar al rival
-      try { await negociar(); } catch (_) {}
+      // onnegotiationneeded se dispara solo
     }
   }
 
   async function activarMic() {
     try {
+      abrirPanel();
       await obtenerLocalStream(camOn, true);
       micOn = true;
       crearPC();
-      vincularTracks();
-      await negociar();
+      vincularTracks(); // dispara onnegotiationneeded
     } catch (e) {
       mostrarToastLocal("No se pudo acceder al micrófono: " + e.message);
       micOn = false;
@@ -159,7 +241,6 @@
     actualizarBotonesAV();
     if (pc) {
       pc.getSenders().forEach(s => { if (s.track && s.track.kind === "audio") pc.removeTrack(s); });
-      try { await negociar(); } catch (_) {}
     }
   }
 
@@ -170,22 +251,56 @@
   function inyectarHandlers() {
     if (!window.sock || !sock.handlers) return setTimeout(inyectarHandlers, 200);
     sock.handlers.video_offer = async (data) => {
+      asegurarRol(data.from);
       crearPC();
-      // Si aún no tenemos stream local, abrir mic/cam según hayamos activado
-      if (!localStream && (camOn || micOn)) await obtenerLocalStream(camOn, micOn);
-      vincularTracks();
-      await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      sock.enviar({ type: "video_answer", sdp: pc.localDescription });
+      // NO añadir tracks aquí: dispararía onnegotiationneeded en mitad de la
+      // negociación entrante. Los tracks se añaden solo en activarCamara/Mic.
+      const offerCollision =
+        data.sdp && data.sdp.type === "offer" &&
+        (makingOffer || pc.signalingState !== "stable");
+      ignoreOffer = !polite && offerCollision;
+      if (ignoreOffer) {
+        console.warn("[comm] ignorando offer (impolite, collision)");
+        return;
+      }
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        // drena ICE pendientes
+        for (const c of pendingIce) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {}
+        }
+        pendingIce = [];
+        await pc.setLocalDescription();
+        sock.enviar({ type: "video_answer", sdp: pc.localDescription });
+      } catch (e) {
+        console.warn("[comm] error procesando offer:", e);
+      }
     };
     sock.handlers.video_answer = async (data) => {
+      asegurarRol(data.from);
       if (!pc) return;
-      try { await pc.setRemoteDescription(new RTCSessionDescription(data.sdp)); } catch (e) {}
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        for (const c of pendingIce) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {}
+        }
+        pendingIce = [];
+      } catch (e) {
+        console.warn("[comm] error procesando answer:", e);
+      }
     };
     sock.handlers.video_ice = async (data) => {
-      if (!pc || !data.candidate) return;
-      try { await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (_) {}
+      asegurarRol(data.from);
+      if (!data.candidate) return;
+      if (!pc || !pc.remoteDescription) {
+        pendingIce.push(data.candidate);
+        return;
+      }
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+      } catch (e) {
+        if (!ignoreOffer) console.warn("[comm] addIceCandidate fail:", e);
+      }
     };
     sock.handlers.chat = (data) => {
       añadirMensajeChat(data.from || "Rival", data.texto || "", false);
