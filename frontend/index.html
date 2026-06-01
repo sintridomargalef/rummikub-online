@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Rummikub Online</title>
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260523d">
 </head>
 <body class="lobby theme-classic">
   <div class="lobby-top">
@@ -15,6 +15,7 @@
         <option value="theme-cyberpunk">Cyberpunk</option>
         <option value="theme-nature">Naturaleza</option>
         <option value="theme-desert">Desierto</option>
+        <option value="theme-artico">Ártico</option>
       </select>
     </div>
   </div>
@@ -67,6 +68,14 @@
         </span>
       </label>
 
+      <label class="regla-item">
+        <input type="checkbox" id="regla-ver-directo">
+        <span>
+          👁️ Ver la jugada del rival en directo
+          <small>Verás la mesa actualizarse mientras el rival mueve sus fichas, sin esperar a que termine el turno.</small>
+        </span>
+      </label>
+
       <div class="separador-reglas"></div>
 
       <label class="regla-item ia-item">
@@ -103,12 +112,14 @@
     </div>
   </div>
 
+  <footer id="version-footer" class="version-footer">cargando…</footer>
+
   <script>
     document.getElementById("regla-juego-extremo").addEventListener("change", function() {
       document.getElementById("tiempo-turno").disabled = this.checked;
     });
   </script>
-  <script src="/static/js/theme.js"></script>
-  <script src="/static/js/lobby.js"></script>
+  <script src="/static/js/theme.js?v=20260523d"></script>
+  <script src="/static/js/lobby.js?v=20260523d"></script>
 </body>
 </html>

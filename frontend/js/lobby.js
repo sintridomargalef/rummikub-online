@@ -22,6 +22,7 @@ function recogerReglas() {
     tiempo_turno: parseInt(document.getElementById("tiempo-turno").value),
     juego_extremo: document.getElementById("regla-juego-extremo").checked,
     contra_ia: document.getElementById("regla-contra-ia").checked,
+    ver_jugada_directo: document.getElementById("regla-ver-directo").checked,
   };
 }
 
@@ -38,7 +39,7 @@ $("btn-crear").addEventListener("click", async () => {
     if (!r.ok) throw new Error("Servidor no responde");
     const data = await r.json();
     sessionStorage.setItem("rk_nombre", nombre);
-    location.href = `/game?room=${data.codigo}&host=1`;
+    location.href = `/game?room=${data.codigo}&host=1&_v=20260523d`;
   } catch (e) {
     setMsg("Error: " + e.message, "error");
   }
@@ -61,7 +62,7 @@ $("btn-unirse").addEventListener("click", async () => {
     }
     if (!r.ok) throw new Error("Servidor no responde");
     sessionStorage.setItem("rk_nombre", nombre);
-    location.href = `/game?room=${codigo}`;
+    location.href = `/game?room=${codigo}&_v=20260523d`;
   } catch (e) {
     setMsg("Error: " + e.message, "error");
   }
@@ -133,3 +134,17 @@ btnCerrarRanking.addEventListener("click", () => overlayRanking.classList.add("h
 overlayRanking.addEventListener("click", (e) => {
   if (e.target === overlayRanking) overlayRanking.classList.add("hidden");
 });
+
+// Pie con la versión del programa (commit + fecha)
+(async () => {
+  const footer = document.getElementById("version-footer");
+  if (!footer) return;
+  try {
+    const r = await fetch("/api/version");
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    footer.textContent = `Rummikub Online · ${d.commit} · ${d.fecha}`;
+  } catch {
+    footer.textContent = "Rummikub Online";
+  }
+})();

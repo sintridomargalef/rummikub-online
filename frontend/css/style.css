@@ -754,6 +754,22 @@ body.game {
   transform: scale(1.05);
 }
 
+/* Pie discreto con la versión del programa (lobby) */
+.version-footer {
+  position: fixed;
+  bottom: 6px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--texto-tenue);
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ====== Acciones laterales fijas (botones grandes, fáciles de tocar con pulgar) ====== */
 .acciones-laterales {
   position: fixed;
