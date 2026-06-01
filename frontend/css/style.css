@@ -908,7 +908,7 @@ body.theme-cyberpunk .acciones-laterales .lateral-secundario {
 .ficha.negro   { color: #1a1a1a; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
 .ficha.azul    { color: #0d47a1; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
 .ficha.rojo    { color: #cc0000; text-shadow: 0 1px 0 rgba(255,255,255,.5), 0 0 8px rgba(200,0,0,.3); }
-.ficha.amarillo{ color: #e66000; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
+.ficha.amarillo{ color: #d4a000; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
 .ficha.joker {
   color: #6a0dad;
   background: linear-gradient(175deg, #fefefe 0%, #f3ecd8 55%, #e8dfc0 100%);
