@@ -810,13 +810,14 @@ body.game {
 
 /* ====== Acciones laterales fijas (botones grandes, fáciles de tocar con pulgar) ====== */
 .acciones-laterales {
-  position: absolute;     /* dentro de .mesa, pegado a la derecha */
-  right: 12px;
-  bottom: 16px;           /* esquina inferior derecha del tablero */
+  position: fixed;
+  right: 14px;
+  /* Encima del atril: el atril tiene 2 filas ≈ 220px + wrapper padding ≈ 250px total */
+  bottom: 260px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  z-index: 20;
+  z-index: 50;
   pointer-events: none;
 }
 .acciones-laterales button {
@@ -862,7 +863,7 @@ body.theme-cyberpunk .acciones-laterales .lateral-secundario {
 @media (max-width: 700px) {
   .acciones-laterales {
     right: 8px;
-    bottom: 12px;
+    bottom: 200px;
     gap: 8px;
   }
   .acciones-laterales button {
