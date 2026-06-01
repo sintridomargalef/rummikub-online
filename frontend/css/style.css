@@ -754,6 +754,71 @@ body.game {
   transform: scale(1.05);
 }
 
+/* ====== Acciones laterales fijas (botones grandes, fáciles de tocar con pulgar) ====== */
+.acciones-laterales {
+  position: fixed;
+  right: 12px;
+  bottom: 145px;          /* encima del atril */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 40;
+  pointer-events: none;   /* el contenedor no captura, sí los botones */
+}
+.acciones-laterales button {
+  pointer-events: auto;
+  min-width: 120px;
+  min-height: 64px;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.15;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0,0,0,.45);
+  border: 2px solid transparent;
+  text-shadow: var(--texto-shadow);
+}
+.acciones-laterales button:active { transform: translateY(2px); }
+.acciones-laterales .lateral-principal {
+  background: var(--exito);
+  color: white;
+}
+.acciones-laterales .lateral-principal:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+.acciones-laterales .lateral-secundario {
+  background: #c2520b;
+  color: white;
+}
+.acciones-laterales .lateral-secundario:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+body.theme-cyberpunk .acciones-laterales .lateral-principal {
+  background: transparent;
+  border-color: var(--exito);
+  color: var(--exito);
+  box-shadow: 0 0 14px var(--exito);
+}
+body.theme-cyberpunk .acciones-laterales .lateral-secundario {
+  background: transparent;
+  border-color: #ff9100;
+  color: #ff9100;
+  box-shadow: 0 0 14px #ff9100;
+}
+@media (max-width: 700px) {
+  .acciones-laterales {
+    right: 8px;
+    bottom: 100px;
+    gap: 8px;
+  }
+  .acciones-laterales button {
+    min-width: 96px;
+    min-height: 56px;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+}
+
 /* Animación de flip 360° — para fichas que aparecen en el ATRIL (reparto inicial
    y robar), como "girarlas para verlas" en el Rummikub real. */
 @keyframes ficha-flip {

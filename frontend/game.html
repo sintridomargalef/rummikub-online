@@ -2,9 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Rummikub Online · Partida</title>
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260523d">
 </head>
 <body class="game theme-classic">
   <header class="topbar">
@@ -16,27 +18,45 @@
       <span id="info-reglas" class="reglas-chip hidden"></span>
     </div>
     <div class="acciones">
-      <button id="btn-fin-turno">Terminar turno</button>
-      <button id="btn-robar">Robar y pasar</button>
       <button id="btn-deshacer" title="Deshacer movimientos de este turno">Deshacer</button>
       <button id="btn-rehacer" title="Rehacer el último deshecho">Rehacer</button>
-      <button id="btn-ordenar" title="Ordenar atril">Ordenar</button>
+      <button id="btn-ordenar" title="Ordenar por número (1→13), jokers al final">Ordenar</button>
       <button id="btn-ayuda" title="Agrupar por colores, de menor a mayor">Ayuda</button>
       <button id="btn-sonido" title="Activar/desactivar sonido">🔊</button>
       <button id="btn-voz" title="Activar/desactivar voz">🗣</button>
       <button id="btn-camara" title="Activar/desactivar cámara">📷 OFF</button>
       <button id="btn-mic" title="Activar/desactivar micrófono">🎤 OFF</button>
       <button id="btn-chat" title="Mostrar/ocultar chat">💬</button>
-      <div class="theme-picker">
-        <select id="theme-select">
-          <option value="theme-classic">Clásico</option>
-          <option value="theme-cyberpunk">Cyberpunk</option>
-          <option value="theme-nature">Naturaleza</option>
-          <option value="theme-desert">Desierto</option>
-        </select>
-      </div>
+      <button id="btn-ficha-minus" title="Fichas más pequeñas">🔎−</button>
+      <button id="btn-ficha-plus" title="Fichas más grandes">🔎+</button>
+      <button id="btn-ajustes" title="Ajustes">⚙</button>
+      <button id="btn-menu" class="hidden" title="Volver al menú">🏠 Menú</button>
     </div>
   </header>
+
+  <div id="panel-ajustes" class="panel-ajustes hidden">
+    <label for="voz-acento">Acento de voz</label>
+    <select id="voz-acento" title="Acento de la voz">
+      <option value="es">🇪🇸 Castellano</option>
+      <option value="fr">🇫🇷 Afrancesado</option>
+      <option value="cu">🇨🇺 Cubano</option>
+      <option value="ro">🇷🇴 Rumano</option>
+      <option value="ru">🇷🇺 Ruso</option>
+      <option value="de">🇩🇪 Alemán</option>
+      <option value="ca">🎗️ Català</option>
+    </select>
+    <button id="btn-fullscreen" style="width:100%;margin-bottom:4px;">[ ] Pantalla completa</button>
+    <label for="theme-select">Tema de color</label>
+    <div class="theme-picker">
+      <select id="theme-select">
+        <option value="theme-classic">Clásico</option>
+        <option value="theme-cyberpunk">Cyberpunk</option>
+        <option value="theme-nature">Naturaleza</option>
+        <option value="theme-desert">Desierto</option>
+        <option value="theme-artico">Ártico</option>
+      </select>
+    </div>
+  </div>
 
   <div id="banner-turno" class="banner-turno hidden">
     <div class="banner-grupo banner-grupo-tiempo">
@@ -61,6 +81,11 @@
     💡 <strong>Click izquierdo</strong> en una ficha del atril la añade a la última combinación · <strong>Click derecho</strong> cancela
   </div>
 
+  <aside id="acciones-laterales" class="acciones-laterales">
+    <button id="btn-fin-turno" class="lateral-principal">✓ Terminar<br>turno</button>
+    <button id="btn-robar" class="lateral-secundario">⤺ Robar<br>y pasar</button>
+  </aside>
+
   <section id="mesa" class="mesa" aria-label="Mesa de juego"></section>
 
   <footer class="atril-wrapper">
@@ -70,6 +95,7 @@
 
   <!-- Panel de vídeo + chat -->
   <aside id="panel-comm" class="panel-comm hidden">
+    <div id="panel-comm-handle" class="panel-comm-handle" title="Arrastra para mover">⠿ Chat / Vídeo</div>
     <div class="panel-videos">
       <div class="video-tile">
         <video id="video-local" autoplay playsinline muted></video>
@@ -109,13 +135,14 @@
     <div class="overlay-box">
       <h2 id="overlay-titulo"></h2>
       <p id="overlay-msg"></p>
+      <button id="overlay-menu">🏠 Volver al menú</button>
       <button id="overlay-cerrar">Cerrar</button>
     </div>
   </div>
 
-  <script src="/static/js/theme.js"></script>
-  <script src="/static/js/ws.js"></script>
-  <script src="/static/js/game.js"></script>
-  <script src="/static/js/comm.js"></script>
+  <script src="/static/js/theme.js?v=20260523d"></script>
+  <script src="/static/js/ws.js?v=20260523d"></script>
+  <script src="/static/js/game.js?v=20260523d"></script>
+  <script src="/static/js/comm.js?v=20260523d"></script>
 </body>
 </html>
