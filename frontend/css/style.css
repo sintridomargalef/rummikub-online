@@ -731,20 +731,44 @@ body.game {
 .ficha {
   width: var(--ficha-w);
   height: var(--ficha-h);
-  background: var(--tile-bg);
-  border-radius: 6px;
+  /* Fondo crema cálido con degradado — igual que las fichas físicas */
+  background: linear-gradient(175deg, #fefefe 0%, #f7f0dc 55%, #ede3c4 100%);
+  border-radius: 7px 7px 5px 5px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 900;
   font-size: var(--ficha-fs);
   cursor: grab;
   user-select: none;
-  box-shadow: var(--tile-sombra);
   position: relative;
   flex-shrink: 0;
-  border: 1px solid var(--tile-borde);
-  font-family: var(--titulo-font);
+  font-family: "Arial Rounded MT Bold", "Arial Black", "Helvetica Neue", sans-serif;
+  /* Borde lateral + borde inferior grueso = efecto de altura 3D */
+  border: 1px solid #c4aa76;
+  border-bottom: 6px solid #9a7c44;
+  border-right: 2px solid #b89c60;
+  /* Sombra exterior + resaltado interior en la parte superior */
+  box-shadow:
+    3px 4px 10px rgba(0,0,0,.35),
+    1px 2px 4px  rgba(0,0,0,.2),
+    inset 0 2px 3px rgba(255,255,255,.85),
+    inset 0 -1px 2px rgba(0,0,0,.08);
+}
+/* Línea de marca en la parte inferior de la cara de la ficha */
+.ficha::before {
+  content: "Rummikub";
+  position: absolute;
+  bottom: 5px;
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 7px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: rgba(100,80,40,.35);
+  font-family: "Georgia", serif;
+  font-style: italic;
+  pointer-events: none;
 }
 .ficha:active { cursor: grabbing; }
 .ficha.dragging { opacity: .25; }
@@ -752,9 +776,13 @@ body.game {
 .ficha.ghost {
   pointer-events: none;
   transform: scale(1.18) rotate(3deg) !important;
-  box-shadow: 0 18px 36px rgba(0,0,0,.55), 0 6px 12px rgba(0,0,0,.35) !important;
-  filter: brightness(1.08);
-  opacity: 0.92 !important;
+  box-shadow:
+    0 22px 40px rgba(0,0,0,.6),
+    0 8px 16px  rgba(0,0,0,.4),
+    inset 0 2px 3px rgba(255,255,255,.85) !important;
+  border-bottom-width: 8px !important;
+  filter: brightness(1.06);
+  opacity: 0.93 !important;
 }
 /* Micro-bounce al coger la ficha */
 @keyframes ficha-pickup {
@@ -876,21 +904,42 @@ body.theme-cyberpunk .acciones-laterales .lateral-secundario {
   100% { transform: scale(1)    translateY(0);    opacity: 1; }
 }
 .ficha.drop-in { animation: ficha-drop 0.32s cubic-bezier(.2,.8,.3,1); }
-.ficha.negro { color: var(--negro); }
-.ficha.azul { color: var(--azul); text-shadow: var(--texto-shadow); }
-.ficha.rojo { color: var(--rojo); text-shadow: var(--texto-shadow); }
-.ficha.amarillo { color: var(--amarillo); text-shadow: var(--texto-shadow); }
+.ficha.negro   { color: #1a1a1a; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
+.ficha.azul    { color: #0d47a1; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
+.ficha.rojo    { color: #b71c1c; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
+.ficha.amarillo{ color: #e65100; text-shadow: 0 1px 0 rgba(255,255,255,.4); }
 .ficha.joker {
-  color: var(--joker);
-  text-shadow: var(--texto-shadow);
+  color: #6a0dad;
+  background: linear-gradient(175deg, #fefefe 0%, #f3ecd8 55%, #e8dfc0 100%);
 }
 .ficha.joker::after {
   content: "★";
-  font-size: 54px;
+  font-size: 48px;
+  text-shadow: 0 1px 0 rgba(255,255,255,.4);
 }
 
+/* Cyberpunk: fondo oscuro, glow en el número */
 body.theme-cyberpunk .ficha {
-  text-shadow: 0 0 6px currentColor;
+  background: linear-gradient(175deg, #1a002e 0%, #14002a 100%);
+  border-color: var(--primario);
+  border-bottom-color: #6600aa;
+  border-right-color: #8800cc;
+  box-shadow: 0 0 10px var(--primario), 2px 4px 10px rgba(0,0,0,.5),
+    inset 0 1px 2px rgba(255,100,255,.2) !important;
+}
+body.theme-cyberpunk .ficha::before { display: none; }
+body.theme-cyberpunk .ficha.negro    { color: #ffffff; }
+body.theme-cyberpunk .ficha.azul     { color: #00f0ff; text-shadow: 0 0 8px #00f0ff; }
+body.theme-cyberpunk .ficha.rojo     { color: #ff003c; text-shadow: 0 0 8px #ff003c; }
+body.theme-cyberpunk .ficha.amarillo { color: #f6ff00; text-shadow: 0 0 8px #f6ff00; }
+body.theme-cyberpunk .ficha.joker    { color: #ff00ff; background: linear-gradient(175deg,#1a002e,#14002a); }
+
+/* Desierto: mantiene el aspecto físico pero más cálido */
+body.theme-desert .ficha {
+  background: linear-gradient(175deg, #fdf4d8 0%, #f5e8c0 55%, #ebd9a8 100%);
+  border-color: #b8903a;
+  border-bottom-color: #8a6820;
+  border-right-color: #a07828;
 }
 
 /* ===== Toast / overlay ===== */
