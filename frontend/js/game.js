@@ -25,6 +25,60 @@ let sonidoActivo = (() => {
 let vozActiva = (() => {
   try { return localStorage.getItem("rk_voz") === "on"; } catch (_) { return false; }
 })();
+let acentoActivo = (() => {
+  try { return localStorage.getItem("rk_voz_acento") || "es"; } catch (_) { return "es"; }
+})();
+const ACENTOS = {
+  es: { lang: "es-ES", pitch: 1.0,  rate: 1.05 },
+  fr: { lang: "fr-FR", pitch: 1.0,  rate: 1.0  },
+  cu: { lang: "es-MX", pitch: 1.25, rate: 1.15, fallbackLang: "es-ES" },
+  ro: { lang: "ro-RO", pitch: 1.0,  rate: 1.0  },
+  ru: { lang: "ru-RU", pitch: 0.95, rate: 0.95 },
+  de: { lang: "de-DE", pitch: 1.0,  rate: 1.0  },
+  ca: { lang: "ca-ES", pitch: 1.0,  rate: 1.0, fallbackLang: "es-ES" },
+};
+// ====== Traducciones ======
+const TRADUCCIONS_CA = {
+  "Es tu turno":                                   "És el teu torn",
+  "Turno de {0}":                                  "Torn de {0}",
+  "Tu turno":                                      "El teu torn",
+  "(tú)":                                          "(tu)",
+  "¡Ganador: {0}!":                                "Guanyador: {0}!",
+  "Has ganado":                                    "Has guanyat",
+  "Ha ganado {0}":                                 "Ha guanyat {0}",
+  "¡Has ganado!":                                  "Has guanyat!",
+  "Fin de partida":                                "Fi de la partida",
+  "Ganador: {0}":                                  "Guanyador: {0}",
+  "Treinta segundos":                              "Trenta segons",
+  "Tiempo agotado":                                "Temps esgotat",
+  "Tiempo agotado — enviando jugada...":           "Temps esgotat — enviant jugada...",
+  "Tiempo agotado: has robado y pasado turno":     "Temps esgotat: has agafat i passat torn",
+  "Voz activada":                                  "Veu activada",
+  "Voz cambiada":                                  "Veu canviada",
+  "Escalera partida en dos":                       "Escala dividida en dos",
+  "Joker reemplazado y añadido a tu atril":        "Comodí reemplaçat i afegit al teu faristol",
+  "Suelta aquí para nueva combinación":            "Deixa aquí per a nova combinació",
+  "Arrastra para mover la combinación":            "Arrossega per moure la combinació",
+  "Mazo: {0}":                                     "Pila: {0}",
+  "Reglas: {0}":                                   "Regles: {0}",
+  "Conectado, esperando…":                         "Connectat, esperant…",
+  "Conexión cerrada, reintentando…":               "Connexió tancada, reintentant…",
+  "Sala {0} — esperando rival":                    "Sala {0} — esperant rival",
+  "Sala {0} — conectando…":                        "Sala {0} — connectant…",
+  "Jugadores: {0}":                                "Jugadors: {0}",
+  "No se pudo copiar. Selecciona y copia a mano.":"No s'ha pogut copiar. Selecciona i copia manualment.",
+};
+function t(texto, ...vars) {
+  let s = (acentoActivo === "ca" && TRADUCCIONS_CA[texto]) ? TRADUCCIONS_CA[texto] : texto;
+  vars.forEach((v, i) => { s = s.replace(`{${i}}`, v); });
+  return s;
+}
+
+let _voces = [];
+if ("speechSynthesis" in window) {
+  _voces = window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => { _voces = window.speechSynthesis.getVoices(); };
+}
 let audioCtx = null;
 function _audio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -54,10 +108,18 @@ function decir(texto) {
   if (!vozActiva) return;
   if (!("speechSynthesis" in window)) return;
   try {
+    const cfg = ACENTOS[acentoActivo] || ACENTOS.es;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(texto);
-    u.lang = "es-ES";
-    u.rate = 1.05;
+    // Comparar solo el código de idioma base (2 letras): matchea "ca", "ca-ES", "ca_ES"...
+    const base = (s) => (s || "").toLowerCase().replace("_", "-").split("-")[0];
+    const objetivo = base(cfg.lang);
+    const voz = _voces.find(v => base(v.lang) === objetivo)
+             || (cfg.fallbackLang && _voces.find(v => base(v.lang) === base(cfg.fallbackLang)));
+    if (voz) u.voice = voz;
+    u.lang = (voz && voz.lang) || cfg.lang;
+    u.pitch = cfg.pitch;
+    u.rate = cfg.rate;
     u.volume = 0.9;
     window.speechSynthesis.speak(u);
   } catch (_) {}
@@ -142,6 +204,10 @@ let idsMesaAlInicio = new Set();
 // IDs de fichas recién jugadas por el rival (para resaltarlas)
 let ultimasFichasNuevas = new Set();
 let ultimaMesaSnapshot = null;
+// Tracker para animación de flip: IDs que ya estaban en la mesa en el render previo.
+// Las que NO estaban → reciben la clase .flip-in en este render.
+let _idsEnMesaPrev = new Set();
+let _idsNuevasEnMesa = new Set();
 // Último combo donde se colocó una ficha (para doble-click)
 let ultimoDropIdx = null;
 // Estado local mutable: mesa y atril.
@@ -193,8 +259,14 @@ function renderFicha(tile, dragHabilitado) {
   const div = document.createElement("div");
   div.className = "ficha";
   div.dataset.id = tile.id;
-  if (!dragHabilitado && ultimasFichasNuevas.has(tile.id)) {
+  // ultimasFichasNuevas solo contiene ids de fichas en la mesa, así que es
+  // seguro marcar sin importar si la ficha es arrastrable (es tu turno).
+  if (ultimasFichasNuevas.has(tile.id)) {
     div.classList.add("recien-jugada");
+  }
+  // Animación de flip: aparece girando cuando entra a la mesa.
+  if (_idsNuevasEnMesa.has(tile.id)) {
+    div.classList.add("flip-in");
   }
   if (tile.is_joker) {
     div.classList.add("joker");
@@ -221,6 +293,13 @@ function renderFicha(tile, dragHabilitado) {
 function render() {
   // Mesa: solo arrastrable si es mi turno
   const reglasActivas = (snapshotServidor && snapshotServidor.reglas) || {};
+  // Calcular qué fichas son NUEVAS en la mesa respecto al render anterior
+  // (para animarlas con flip).
+  const idsActuales = new Set();
+  for (const comb of mesaLocal) for (const t of comb) idsActuales.add(t.id);
+  _idsNuevasEnMesa = new Set();
+  for (const id of idsActuales) if (!_idsEnMesaPrev.has(id)) _idsNuevasEnMesa.add(id);
+  _idsEnMesaPrev = idsActuales;
   mesaEl.innerHTML = "";
   mesaLocal.forEach((comb, idx) => {
     const c = document.createElement("div");
@@ -231,7 +310,7 @@ function render() {
     if (miTurno) {
       const handle = document.createElement("div");
       handle.className = "combo-handle";
-      handle.title = "Arrastra para mover la combinación";
+      handle.title = t("Arrastra para mover la combinación");
       attachCombinacionDrag(handle, c, idx);
       c.appendChild(handle);
     }
@@ -248,7 +327,7 @@ function render() {
   const nueva = document.createElement("div");
   nueva.className = "combinacion combinacion-nueva";
   nueva.dataset.idx = "nueva";
-  nueva.textContent = miTurno ? "Suelta aquí para nueva combinación" : "";
+  nueva.textContent = miTurno ? t("Suelta aquí para nueva combinación") : "";
   habilitarDropEnCombinacion(nueva, "nueva");
   mesaEl.appendChild(nueva);
 
@@ -274,15 +353,12 @@ function render() {
   // estado top
   if (snapshotServidor) {
     if (snapshotServidor.ganador) {
-      infoTurno.textContent = `¡Ganador: ${snapshotServidor.ganador}!`;
+      infoTurno.textContent = t("¡Ganador: {0}!", snapshotServidor.ganador);
     } else {
-      infoTurno.textContent = miTurno ? "Tu turno" : `Turno de ${snapshotServidor.turno}`;
+      infoTurno.textContent = miTurno ? t("Tu turno") : t("Turno de {0}", snapshotServidor.turno);
     }
-    const rivales = snapshotServidor.rivales_fichas || {};
-    infoRival.textContent = Object.entries(rivales)
-      .map(([n, c]) => `${n}: ${c} fichas`)
-      .join(" · ");
-    infoMazo.textContent = `Mazo: ${snapshotServidor.mazo_restante}`;
+    infoRival.textContent = "";
+    infoMazo.textContent = t("Mazo: {0}", snapshotServidor.mazo_restante);
 
     // chip de reglas opcionales activas
     const reglas = snapshotServidor.reglas || {};
@@ -293,7 +369,7 @@ function render() {
     if (reglas.juego_extremo) activas.push("🔥 EXTREMO");
     else if (reglas.tiempo_turno) activas.push(`⌛${reglas.tiempo_turno}seg`);
     if (activas.length) {
-      chip.textContent = "Reglas: " + activas.join(", ");
+      chip.textContent = t("Reglas: {0}", activas.join(", "));
       chip.classList.remove("hidden");
     } else {
       chip.classList.add("hidden");
@@ -312,13 +388,18 @@ function render() {
     bannerMesaAtril.classList.add("hidden");
   }
 
-  $("btn-fin-turno").disabled = !miTurno || hayInvalidas || mesaEnAtril;
+  $("btn-fin-turno").disabled = !miTurno || hayInvalidas || mesaEnAtril || !jugadaEnCurso;
   $("btn-fin-turno").title = hayInvalidas
     ? "Tienes combinaciones inválidas (en rojo)"
     : mesaEnAtril
       ? "Fichas de la mesa en tu atril — devuélvelas primero"
-      : "";
-  $("btn-robar").disabled = !miTurno || (!hayInvalidas && !mesaEnAtril);
+      : !jugadaEnCurso
+        ? "No has hecho ninguna jugada — usa Robar y pasar"
+        : "";
+  $("btn-robar").disabled = !miTurno || hayInvalidas || mesaEnAtril || jugadaEnCurso;
+  $("btn-robar").title = jugadaEnCurso
+    ? "Ya tienes una jugada en curso — termina el turno o deshazla"
+    : "";
   $("btn-deshacer").disabled = !miTurno || (undoStack.length === 0 && !jugadaEnCurso);
   $("btn-rehacer").disabled = !miTurno || redoStack.length === 0;
 
@@ -330,6 +411,27 @@ function render() {
     hint.classList.add("hidden");
     hint.classList.remove("activo");
   }
+
+  emitirPreviewSiProcede();
+}
+
+// ===== Preview de la jugada en directo (regla ver_jugada_directo) =====
+let _previewTimer = null;
+let _previewPendiente = false;
+function emitirPreviewSiProcede() {
+  const reglas = (snapshotServidor && snapshotServidor.reglas) || {};
+  if (!reglas.ver_jugada_directo || !miTurno || !window.sock) return;
+  _previewPendiente = true;
+  if (_previewTimer) return;
+  _previewTimer = setTimeout(() => {
+    _previewTimer = null;
+    if (!_previewPendiente) return;
+    _previewPendiente = false;
+    const mesa = mesaLocal.map((c) =>
+      c.map((t) => ({ id: t.id, color: t.color, number: t.number, is_joker: t.is_joker }))
+    );
+    try { sock.enviar({ type: "jugada_preview", mesa }); } catch (_) {}
+  }, 200);
 }
 
 function fichasEnAtril() {
@@ -681,7 +783,7 @@ function finalizarDrag(target, clientX) {
           compactarTail();
           clicSonido();
           render();
-          mostrarToast("Escalera partida en dos", "ok");
+          mostrarToast(t("Escalera partida en dos"), "ok");
           return;
         }
       }
@@ -709,7 +811,7 @@ function finalizarDrag(target, clientX) {
           autoOrdenarSiEsEscalera(idxNum);
           clicSonido();
           render();
-          mostrarToast("Joker reemplazado y añadido a tu atril", "ok");
+          mostrarToast(t("Joker reemplazado y añadido a tu atril"), "ok");
           return;
         }
       }
@@ -922,6 +1024,7 @@ function aplicarSnapshot(snap) {
   }
   if (cambioDeTurno) {
     idsMesaAlInicio = new Set(snap.mesa.flat().map((t) => t.id));
+    autopasoPendienteRobar = false; // jugada aceptada: el turno cambió correctamente
   }
   if (cambioDeTurno) {
     if (turnoPrevio !== null && turnoPrevio !== yo) {
@@ -937,9 +1040,9 @@ function aplicarSnapshot(snap) {
   if (cambioDeTurno && !snap.ganador) {
     if (miTurno) {
       sonidoTuTurno();
-      decir("Es tu turno");
+      decir(t("Es tu turno"));
     } else {
-      decir(`Turno de ${snap.turno}`);
+      decir(t("Turno de {0}", snap.turno));
     }
   }
   turnoPrevio = snap.turno;
@@ -957,27 +1060,29 @@ function actualizarBannerTurno() {
     return;
   }
   banner.classList.remove("hidden");
-  nombreEl.textContent = snapshotServidor.turno + (miTurno ? " (tú)" : "");
+  nombreEl.textContent = snapshotServidor.turno + (miTurno ? " " + t("(tú)") : "");
   banner.classList.toggle("tu-turno", miTurno);
 }
 
 // ============ Cronómetros: total + turno ============
 let avisoTiempoEmitido = false;
 let autopasoEjecutado = false;
+let autopasoPendienteRobar = false; // true cuando enviamos proponer_jugada por timeout y esperamos respuesta
 
 function limiteTurnoSeg() {
   const r = snapshotServidor && snapshotServidor.reglas;
-  if (!r || !r.tiempo_total || !r.tiempo_turno) {
-    return 0;  // sin límite
-  }
+  if (!r) return 0;
   if (r.juego_extremo) {
-    // turno proporcional al tiempo total restante
+    // turno proporcional al tiempo total restante (necesita tiempo_total)
+    if (!r.tiempo_total) return 0;
     const ahora = Date.now() / 1000;
     const restanteTotal = Math.max(0, r.tiempo_total - Math.floor(ahora - snapshotServidor.iniciada));
     // mínimo 5s, máximo 1/15 del tiempo restante
     const divisor = r.tiempo_turno || 15; // si no configuraron, default 15
     return Math.max(5, Math.ceil(restanteTotal / divisor));
   }
+  // modo normal: basta con tiempo_turno
+  if (!r.tiempo_turno) return 0;
   return r.tiempo_turno;
 }
 
@@ -1042,19 +1147,20 @@ function actualizarCronometro() {
   if (miTurno && restante === 30 && !avisoTiempoEmitido) {
     avisoTiempoEmitido = true;
     sonidoTiempoAviso();
-    decir("Treinta segundos");
+    decir(t("Treinta segundos"));
   }
   if (restante > 30) avisoTiempoEmitido = false;
 
   // Auto-pasar si se agota
   if (miTurno && restante === 0 && !autopasoEjecutado) {
     autopasoEjecutado = true;
-    decir("Tiempo agotado");
+    decir(t("Tiempo agotado"));
     if (hayCambiosRespectoServidor()) {
       const mesa = mesaLocal.map((c) => c.map((t) => t.id));
       const atril = fichasEnAtril().map((t) => t.id);
       sock.enviar({ type: "proponer_jugada", mesa, atril });
-      mostrarToast("Tiempo agotado — enviando jugada...", "ok");
+      autopasoPendienteRobar = true; // si el servidor la rechaza, el handler de error enviará robar
+      mostrarToast(t("Tiempo agotado — enviando jugada..."), "ok");
     } else {
       if (snapshotServidor) {
         mesaLocal = snapshotServidor.mesa.map((c) => c.map((t) => ({ ...t })));
@@ -1068,10 +1174,10 @@ function actualizarCronometro() {
         render();
       }
       sock.enviar({ type: "robar" });
-      mostrarToast("Tiempo agotado: has robado y pasado turno", "error");
+      mostrarToast(t("Tiempo agotado: has robado y pasado turno"), "error");
     }
   }
-  if (restante > 0) autopasoEjecutado = false;
+  if (restante > 0) { autopasoEjecutado = false; autopasoPendienteRobar = false; }
 }
 setInterval(actualizarCronometro, 1000);
 
@@ -1157,8 +1263,17 @@ $("btn-voz").addEventListener("click", () => {
   vozActiva = !vozActiva;
   try { localStorage.setItem("rk_voz", vozActiva ? "on" : "off"); } catch (_) {}
   actualizarBotonSonido();
-  if (vozActiva) decir("Voz activada");
+  if (vozActiva) decir(t("Voz activada"));
 });
+const _selAcento = $("voz-acento");
+if (_selAcento) {
+  _selAcento.value = acentoActivo;
+  _selAcento.addEventListener("change", () => {
+    acentoActivo = _selAcento.value;
+    try { localStorage.setItem("rk_voz_acento", acentoActivo); } catch (_) {}
+    if (vozActiva) decir(t("Voz cambiada"));
+  });
+}
 actualizarBotonSonido();
 
 function colocarPorFilas(fila0Tiles, fila1Tiles) {
@@ -1170,17 +1285,96 @@ function colocarPorFilas(fila0Tiles, fila1Tiles) {
   compactarTail();
 }
 
+// Detecta tríos (grupos) y escaleras ya presentes en el atril.
+// Heurística greedy: primero grupos, luego escaleras con lo que queda.
+function detectarCombinaciones(fichas) {
+  const reales = fichas.filter((t) => !t.is_joker);
+  const jokers = fichas.filter((t) => t.is_joker);
+  const usadas = new Set();
+  const grupos = [];
+  const escaleras = [];
+
+  // 1) Grupos: mismo número, colores distintos, 3-4 fichas.
+  const porNumero = {};
+  for (const t of reales) (porNumero[t.number] = porNumero[t.number] || []).push(t);
+  Object.keys(porNumero)
+    .sort((a, b) => a - b)
+    .forEach((num) => {
+      const porColor = {};
+      for (const t of porNumero[num]) {
+        if (!usadas.has(t.id) && !porColor[t.color]) porColor[t.color] = t;
+      }
+      const distintos = Object.values(porColor);
+      if (distintos.length >= 3) {
+        distintos.forEach((t) => usadas.add(t.id));
+        grupos.push(distintos);
+      }
+    });
+
+  // 2) Escaleras: mismo color, números consecutivos, 3+ fichas.
+  const porColor = {};
+  for (const t of reales) {
+    if (usadas.has(t.id)) continue;
+    (porColor[t.color] = porColor[t.color] || []).push(t);
+  }
+  Object.keys(porColor).forEach((color) => {
+    const lista = porColor[color].sort((a, b) => a.number - b.number);
+    let run = [];
+    const cerrar = () => {
+      if (run.length >= 3) {
+        run.forEach((x) => usadas.add(x.id));
+        escaleras.push(run);
+      }
+    };
+    for (const t of lista) {
+      if (run.length === 0) { run = [t]; continue; }
+      const prev = run[run.length - 1];
+      if (t.number === prev.number + 1) run.push(t);
+      else if (t.number === prev.number) continue; // duplicado
+      else { cerrar(); run = [t]; }
+    }
+    cerrar();
+  });
+
+  // 3) Resto suelto: por color y número.
+  const resto = reales
+    .filter((t) => !usadas.has(t.id))
+    .sort((a, b) =>
+      a.color !== b.color ? a.color.localeCompare(b.color) : a.number - b.number
+    );
+
+  return { grupos, escaleras, resto, jokers };
+}
+
 $("btn-ordenar").addEventListener("click", () => {
   guardarParaDeshacer();
-  const cmp = (a, b) => {
-    if (a.is_joker) return 1;
-    if (b.is_joker) return -1;
-    if (a.color !== b.color) return a.color.localeCompare(b.color);
-    return a.number - b.number;
-  };
-  const todas = fichasEnAtril().sort(cmp);
-  const mitad = Math.ceil(todas.length / 2);
-  colocarPorFilas(todas.slice(0, mitad), todas.slice(mitad));
+  // María prefiere ordenar por número (1→13); el resto usa detección de combinaciones.
+  const esMaria = /^mar[ií]a$/i.test((nombre || "").trim());
+  if (esMaria) {
+    const ORDEN_COLORES = ["rojo", "azul", "negro", "amarillo"];
+    const todas = fichasEnAtril();
+    const normales = todas
+      .filter((t) => !t.is_joker)
+      .sort((a, b) => a.number !== b.number
+        ? a.number - b.number
+        : ORDEN_COLORES.indexOf(a.color) - ORDEN_COLORES.indexOf(b.color));
+    const jokers = todas.filter((t) => t.is_joker);
+    const ordenadas = [...normales, ...jokers];
+    const mitad = Math.ceil(ordenadas.length / 2);
+    colocarPorFilas(ordenadas.slice(0, mitad), ordenadas.slice(mitad));
+  } else {
+    const { grupos, escaleras, resto, jokers } = detectarCombinaciones(fichasEnAtril());
+    const bloques = [...grupos, ...escaleras, resto, jokers].filter((b) => b.length > 0);
+    const total = bloques.reduce((acc, b) => acc + b.length, 0);
+    const objetivo = total / 2;
+    let acumulado = 0, mejorCorte = 0, mejorDiff = Infinity;
+    for (let i = 0; i <= bloques.length; i++) {
+      const diff = Math.abs(acumulado - objetivo);
+      if (diff < mejorDiff) { mejorDiff = diff; mejorCorte = i; }
+      if (i < bloques.length) acumulado += bloques[i].length;
+    }
+    colocarPorFilas(bloques.slice(0, mejorCorte).flat(), bloques.slice(mejorCorte).flat());
+  }
   render();
 });
 
@@ -1208,6 +1402,21 @@ $("btn-ayuda").addEventListener("click", () => {
 });
 
 $("overlay-cerrar").addEventListener("click", () => overlay.classList.add("hidden"));
+$("overlay-menu").addEventListener("click", () => { window.location.href = "/"; });
+$("btn-menu").addEventListener("click", () => { window.location.href = "/"; });
+$("btn-ajustes").addEventListener("click", () => {
+  $("panel-ajustes").classList.toggle("hidden");
+});
+
+// Cerrar ajustes al hacer clic fuera del panel
+document.addEventListener("click", (e) => {
+  const panel = $("panel-ajustes");
+  if (!panel.classList.contains("hidden") &&
+      !panel.contains(e.target) &&
+      e.target !== $("btn-ajustes")) {
+    panel.classList.add("hidden");
+  }
+});
 
 // ===== Panel de espera con código grande =====
 const espera = $("espera");
@@ -1227,7 +1436,7 @@ async function copiar(txt, boton) {
     boton.textContent = "¡Copiado!";
     setTimeout(() => { boton.textContent = orig; }, 1500);
   } catch (_) {
-    mostrarToast("No se pudo copiar. Selecciona y copia a mano.", "error");
+    mostrarToast(t("No se pudo copiar. Selecciona y copia a mano."), "error");
   }
 }
 
@@ -1246,28 +1455,110 @@ function mostrarToast(txt, tipo = "") {
 
 // ============ WebSocket ============
 const sock = new RKSocket(codigo, nombre, {
-  onOpen: () => { infoTurno.textContent = "Conectado, esperando…"; },
-  onClose: () => mostrarToast("Conexión cerrada, reintentando…"),
+  onOpen: () => { infoTurno.textContent = t("Conectado, esperando…"); },
+  onClose: () => mostrarToast(t("Conexión cerrada, reintentando…")),
   lobby: (data) => {
     if (data.esperando) {
-      infoTurno.textContent = `Sala ${codigo} — esperando rival`;
-      infoRival.textContent = `Jugadores: ${data.jugadores.join(", ")}`;
+      infoTurno.textContent = t("Sala {0} — esperando rival", codigo);
+      infoRival.textContent = t("Jugadores: {0}", data.jugadores.join(", "));
       mostrarEspera();
     } else {
       ocultarEspera();
     }
   },
   estado: (data) => aplicarSnapshot(data.snapshot),
-  error: (data) => { mostrarToast(data.msg, "error"); sonidoError(); decir(data.msg); },
+  jugada_preview: (data) => {
+    const reglas = (snapshotServidor && snapshotServidor.reglas) || {};
+    // Solo el observador pinta la mesa provisional del rival.
+    if (!reglas.ver_jugada_directo || miTurno || !data.mesa) return;
+    mesaLocal = data.mesa.map((c) => c.map((t) => ({ ...t })));
+    render();
+  },
+  error: (data) => {
+    mostrarToast(data.msg, "error");
+    sonidoError();
+    decir(data.msg);
+    // Si el error vino de un proponer_jugada automático por timeout, pasar turno robando
+    if (autopasoPendienteRobar) {
+      autopasoPendienteRobar = false;
+      sock.enviar({ type: "robar" });
+      mostrarToast(t("Tiempo agotado: has robado y pasado turno"), "error");
+    }
+  },
   fin_partida: (data) => {
-    $("overlay-titulo").textContent = data.ganador === yo ? "¡Has ganado!" : "Fin de partida";
-    $("overlay-msg").textContent = `Ganador: ${data.ganador}`;
+    $("overlay-titulo").textContent = data.ganador === yo ? t("¡Has ganado!") : t("Fin de partida");
+    $("overlay-msg").textContent = t("Ganador: {0}", data.ganador);
     overlay.classList.remove("hidden");
+    $("btn-menu").classList.remove("hidden");
     sonidoVictoria();
-    decir(data.ganador === yo ? "Has ganado" : `Ha ganado ${data.ganador}`);
+    decir(data.ganador === yo ? t("Has ganado") : t("Ha ganado {0}", data.ganador));
   },
 });
 sock.conectar();
 window.sock = sock;  // expuesto para comm.js
 
-infoTurno.textContent = `Sala ${codigo} — conectando…`;
+infoTurno.textContent = t("Sala {0} — conectando…", codigo);
+
+// ====== Pantalla completa ======
+(function () {
+  const btn = $("btn-fullscreen");
+  if (!btn) return;
+
+  const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const soportaFS = !!(document.documentElement.requestFullscreen
+                    || document.documentElement.webkitRequestFullscreen);
+
+  function actualizarIcono() {
+    const activo = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    btn.textContent = activo ? "[X] Salir pantalla completa" : "[ ] Pantalla completa";
+  }
+
+  btn.addEventListener("click", () => {
+    if (esIOS || !soportaFS) {
+      mostrarToast("En iOS: pulsa Compartir → 'Añadir a pantalla de inicio' para jugar a pantalla completa", "ok");
+      return;
+    }
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else {
+      const el = document.documentElement;
+      (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+    }
+  });
+
+  document.addEventListener("fullscreenchange", actualizarIcono);
+  document.addEventListener("webkitfullscreenchange", actualizarIcono);
+  actualizarIcono();
+})();
+
+// ====== Control de tamaño de fichas ======
+(function () {
+  const TALLAS = [
+    { w: 40,  h: 54,  fs: 20, label: "XS" },
+    { w: 48,  h: 65,  fs: 24, label: "S"  },
+    { w: 60,  h: 81,  fs: 30, label: "M"  },
+    { w: 76,  h: 103, fs: 38, label: "L"  },
+    { w: 92,  h: 125, fs: 46, label: "XL" },
+  ];
+  const DEFAULT_IDX = 3; // L — tamaño original de escritorio
+
+  function aplicarTalla(idx) {
+    const s = TALLAS[idx];
+    document.body.style.setProperty("--ficha-w", s.w + "px");
+    document.body.style.setProperty("--ficha-h", s.h + "px");
+    document.body.style.setProperty("--ficha-fs", s.fs + "px");
+    const lbl = $("ficha-size-label");
+    if (lbl) lbl.textContent = s.label;
+    try { localStorage.setItem("rk_ficha_size", idx); } catch (_) {}
+  }
+
+  let idx;
+  try { idx = parseInt(localStorage.getItem("rk_ficha_size") ?? DEFAULT_IDX); } catch (_) { idx = DEFAULT_IDX; }
+  if (isNaN(idx) || idx < 0 || idx >= TALLAS.length) idx = DEFAULT_IDX;
+  aplicarTalla(idx);
+
+  const btnM = $("btn-ficha-minus");
+  const btnP = $("btn-ficha-plus");
+  if (btnM) btnM.addEventListener("click", () => { idx = Math.max(0, idx - 1); aplicarTalla(idx); });
+  if (btnP) btnP.addEventListener("click", () => { idx = Math.min(TALLAS.length - 1, idx + 1); aplicarTalla(idx); });
+})();

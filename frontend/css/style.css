@@ -151,6 +151,42 @@ body.theme-desert {
                   repeating-linear-gradient(45deg, transparent 0 3px, rgba(139,90,43,.04) 3px 4px);
 }
 
+/* ---------- Tema ÁRTICO ---------- */
+body.theme-artico {
+  --bg: #1c2e3e;
+  --bg-2: #26405a;
+  --bg-input: #142230;
+  --topbar: #112030;
+  --topbar-borde: #3a6a8a;
+  --mesa: #2e5a7a;
+  --mesa-textura: rgba(255,255,255,.05);
+  --atril: #7a96ac;
+  --atril-borde: #2a4458;
+  --texto: #e8f4fa;
+  --texto-tenue: rgba(232,244,250,.7);
+  --tile-bg: #eef6fb;
+  --tile-borde: #3a6a8a;
+  --tile-sombra: 1px 2px 0 rgba(0,20,40,.45), inset 0 2px 0 rgba(255,255,255,.55);
+  --negro: #16242f;
+  --azul: #2570c4;
+  --rojo: #d0492f;
+  --amarillo: #d9a31a;
+  --joker: #5ad0e8;
+  --primario: #3a8ab0;
+  --primario-hover: #4aa6cc;
+  --exito: #4ec0a8;
+  --peligro: #d0492f;
+  --acento: #5ad0e8;
+  --combinacion-bg: rgba(8,26,42,.28);
+  --combinacion-nueva-bg: rgba(150,220,255,.07);
+  --combinacion-nueva-borde: rgba(150,220,255,.4);
+  --titulo-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --titulo-letter: 0;
+  --texto-shadow: none;
+  --mesa-overlay: radial-gradient(circle at 25% 25%, rgba(150,220,255,.10), transparent 45%),
+                  radial-gradient(circle at 75% 70%, rgba(90,208,232,.08), transparent 50%);
+}
+
 /* ===== Base ===== */
 * { box-sizing: border-box; }
 html, body {
@@ -372,6 +408,11 @@ body.game {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;  /* dvh descuenta la barra del navegador móvil */
+  /* Tamaño único de ficha/hueco/celda — garantiza que todo cuadre */
+  --ficha-w: 76px;
+  --ficha-h: 103px;
+  --ficha-fs: 38px;
 }
 .topbar {
   background: var(--topbar);
@@ -503,8 +544,8 @@ body.game {
 }
 
 .ficha.recien-jugada {
-  filter: brightness(0.85);
-  box-shadow: inset 0 0 0 2px rgba(255,255,255,.15);
+  filter: brightness(0.82);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.25);
 }
 
 .hint-dobleclick {
@@ -527,6 +568,35 @@ body.game {
   border-bottom: 2px solid var(--acento);
 }
 .hint-dobleclick strong { font-weight: 800; }
+
+/* Menú de ajustes (acento de voz + tema) */
+.panel-ajustes {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 60;
+  background: var(--bg-2);
+  border: 1px solid var(--atril-borde);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.6);
+  min-width: 240px;
+  max-height: 80dvh;
+  overflow-y: auto;
+}
+.panel-ajustes.hidden { display: none; }
+.panel-ajustes label {
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--texto-tenue);
+  font-weight: 700;
+}
+.panel-ajustes select { font-size: 13px; padding: 4px 6px; }
 
 @media (max-width: 700px) {
   .banner-turno { gap: 6px; padding: 4px 8px; }
@@ -625,26 +695,29 @@ body.game {
   padding: 10px;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;  /* no estirar los atriles al ancho del wrapper */
   gap: 6px;
   overflow-x: auto;
+  max-width: 100%;  /* nunca más ancho que el padre → fuerza scroll interno */
 }
 .atril {
   background: var(--atril);
   border-radius: 8px;
   padding: 8px;
+  width: max-content;  /* el fondo se extiende bajo todas las fichas */
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 72px;
-  grid-template-rows: 98px;
+  grid-auto-columns: var(--ficha-w);
+  grid-template-rows: var(--ficha-h);
   gap: 4px;
-  min-height: 116px;
+  min-height: calc(var(--ficha-h) + 18px);
   box-shadow: inset 0 2px 4px rgba(0,0,0,.3);
   border: 2px dashed transparent;
 }
 .atril.drop-target { border-color: var(--texto); }
 .slot {
-  width: 72px;
-  height: 98px;
+  width: var(--ficha-w);
+  height: var(--ficha-h);
   border-radius: 5px;
   background: rgba(0,0,0,.06);
   border: 1px dashed rgba(0,0,0,.18);
@@ -656,15 +729,15 @@ body.game {
 
 /* ===== Ficha ===== */
 .ficha {
-  width: 72px;
-  height: 98px;
+  width: var(--ficha-w);
+  height: var(--ficha-h);
   background: var(--tile-bg);
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 40px;
+  font-size: var(--ficha-fs);
   cursor: grab;
   user-select: none;
   box-shadow: var(--tile-sombra);
@@ -679,6 +752,37 @@ body.game {
   pointer-events: none;
   box-shadow: 0 4px 14px rgba(0,0,0,.5);
   transform: scale(1.05);
+}
+
+/* Animación de flip al colocar una ficha en la mesa (estilo Rummikub oficial) */
+@keyframes ficha-flip {
+  0% {
+    transform: perspective(600px) rotateY(0deg) translateY(-20px) scale(0.85);
+    opacity: 0;
+    box-shadow: 0 12px 24px rgba(0,0,0,.5);
+  }
+  25% {
+    transform: perspective(600px) rotateY(90deg) translateY(-10px) scale(0.95);
+    opacity: 0.6;
+  }
+  50% {
+    transform: perspective(600px) rotateY(180deg) translateY(-4px) scale(1.05);
+    opacity: 0.9;
+    box-shadow: 0 8px 18px rgba(0,0,0,.45);
+  }
+  75% {
+    transform: perspective(600px) rotateY(270deg) translateY(-2px) scale(1.03);
+    opacity: 0.95;
+  }
+  100% {
+    transform: perspective(600px) rotateY(360deg) translateY(0) scale(1);
+    opacity: 1;
+    box-shadow: var(--tile-sombra);
+  }
+}
+.ficha.flip-in {
+  animation: ficha-flip 0.55s cubic-bezier(.2,.7,.2,1);
+  transform-style: preserve-3d;
 }
 .ficha.negro { color: var(--negro); }
 .ficha.azul { color: var(--azul); text-shadow: var(--texto-shadow); }
@@ -747,6 +851,19 @@ body.theme-cyberpunk .ficha {
   box-shadow: 0 4px 16px rgba(0,0,0,.5);
   z-index: 50;
   overflow: hidden;
+}
+.panel-comm-handle {
+  cursor: move;
+  padding: 5px 8px;
+  background: var(--bg-input);
+  color: var(--acento);
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: .5px;
+  text-align: center;
+  user-select: none;
+  touch-action: none;
+  border-bottom: 1px solid var(--atril-borde);
 }
 .panel-videos {
   display: grid;
@@ -838,7 +955,7 @@ body.theme-cyberpunk .ficha {
   color: white;
 }
 @media (max-width: 700px) {
-  .panel-comm { width: 200px; top: 50px; }
+  .panel-comm { width: 200px; top: 110px; }
   .video-tile { aspect-ratio: 1 / 1; }
 }
 
@@ -881,25 +998,20 @@ body.theme-cyberpunk .ficha {
 
 /* ===== Responsive (móvil) ===== */
 @media (max-width: 700px) {
-  .ficha {
-    width: 52px;
-    height: 70px;
-    font-size: 28px;
-  }
+  /* Tamaño de ficha móvil: una sola variable, todo (ficha/hueco/grid) cuadra */
+  body.game { --ficha-w: 52px; --ficha-h: 70px; --ficha-fs: 28px; }
   .ficha.joker::after { font-size: 38px; }
   .combinacion {
     min-height: 84px;
     min-width: 70px;
     padding: 4px;
   }
+  /* Fichas de tamaño fijo cómodo; el atril hace scroll horizontal y su
+     fondo (width: max-content) cuadra exacto con el nº de fichas. */
   .atril {
-    grid-auto-columns: 52px;
-    grid-template-rows: 70px;
-    min-height: 84px;
     padding: 4px;
     gap: 3px;
   }
-  .slot { width: 52px; height: 70px; }
   .topbar { padding: 6px 8px; font-size: 12px; }
   .topbar .info { gap: 6px; font-size: 11px; }
   .topbar .info span { padding: 2px 6px; }
@@ -908,6 +1020,22 @@ body.theme-cyberpunk .ficha {
   .codigo-grande { font-size: 48px; letter-spacing: 8px; }
   .lobby-box { width: 92vw; padding: 20px; }
   .lobby-top { width: 92vw; }
+
+  /* Botones secundarios → iconos (ahorra espacio en la topbar) */
+  #btn-deshacer, #btn-rehacer, #btn-ordenar, #btn-ayuda { font-size: 0; padding: 6px 9px; }
+  #btn-deshacer::before { content: "↶"; font-size: 17px; }
+  #btn-rehacer::before  { content: "↷"; font-size: 17px; }
+  #btn-ordenar::before  { content: "⇅"; font-size: 17px; }
+  #btn-ayuda::before    { content: "?"; font-size: 17px; }
+
+  /* El hint de click derecho no aplica en táctil */
+  .hint-dobleclick { display: none !important; }
+
+  /* El atril nunca se comprime; la mesa cede el espacio */
+  .atril-wrapper { flex-shrink: 0; }
+  .mesa { min-height: 80px; }
+  /* El body no scrollea horizontalmente; el scroll queda dentro del atril-wrapper */
+  body.game { overflow-x: hidden; }
 }
 
 .espera-box { max-width: 480px; }
