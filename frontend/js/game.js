@@ -204,10 +204,14 @@ let idsMesaAlInicio = new Set();
 // IDs de fichas recién jugadas por el rival (para resaltarlas)
 let ultimasFichasNuevas = new Set();
 let ultimaMesaSnapshot = null;
-// Tracker para animación de flip: IDs que ya estaban en la mesa en el render previo.
-// Las que NO estaban → reciben la clase .flip-in en este render.
+// Trackers para animaciones:
+//   .drop-in  → fichas nuevas en la mesa (pop suave)
+//   .flip-in  → fichas nuevas en el atril (giro 360°, como destaparlas)
 let _idsEnMesaPrev = new Set();
 let _idsNuevasEnMesa = new Set();
+let _idsEnAtrilPrev = new Set();
+let _idsNuevasEnAtril = new Set();
+let _contadorFlipDelay = 0;  // se resetea al inicio de cada render
 // Último combo donde se colocó una ficha (para doble-click)
 let ultimoDropIdx = null;
 // Estado local mutable: mesa y atril.
@@ -264,9 +268,16 @@ function renderFicha(tile, dragHabilitado) {
   if (ultimasFichasNuevas.has(tile.id)) {
     div.classList.add("recien-jugada");
   }
-  // Animación de flip: aparece girando cuando entra a la mesa.
-  if (_idsNuevasEnMesa.has(tile.id)) {
+  // Animación al aparecer: flip si es nueva en el atril (giro 360°),
+  // drop-in si es nueva en la mesa (pop suave).
+  if (_idsNuevasEnAtril.has(tile.id)) {
     div.classList.add("flip-in");
+    // Delay escalonado para efecto "reparto": cada ficha sucesiva en este render
+    // arranca un poco más tarde, así no animan todas a la vez.
+    div.style.animationDelay = (_contadorFlipDelay * 0.045) + "s";
+    _contadorFlipDelay++;
+  } else if (_idsNuevasEnMesa.has(tile.id)) {
+    div.classList.add("drop-in");
   }
   if (tile.is_joker) {
     div.classList.add("joker");
@@ -293,13 +304,22 @@ function renderFicha(tile, dragHabilitado) {
 function render() {
   // Mesa: solo arrastrable si es mi turno
   const reglasActivas = (snapshotServidor && snapshotServidor.reglas) || {};
-  // Calcular qué fichas son NUEVAS en la mesa respecto al render anterior
-  // (para animarlas con flip).
-  const idsActuales = new Set();
-  for (const comb of mesaLocal) for (const t of comb) idsActuales.add(t.id);
+  // Calcular qué fichas son NUEVAS en la mesa y en el atril respecto al render anterior.
+  const idsActualesMesa = new Set();
+  for (const comb of mesaLocal) for (const t of comb) idsActualesMesa.add(t.id);
+  const idsActualesAtril = new Set();
+  for (const fila of atrilLocal) for (const t of fila) if (t) idsActualesAtril.add(t.id);
   _idsNuevasEnMesa = new Set();
-  for (const id of idsActuales) if (!_idsEnMesaPrev.has(id)) _idsNuevasEnMesa.add(id);
-  _idsEnMesaPrev = idsActuales;
+  _idsNuevasEnAtril = new Set();
+  // Una ficha es "nueva en la mesa" si está en la mesa y NO estaba en mesa antes
+  // (independientemente de si venía del atril propio o de un broadcast del rival).
+  for (const id of idsActualesMesa) if (!_idsEnMesaPrev.has(id)) _idsNuevasEnMesa.add(id);
+  // Una ficha es "nueva en el atril" si está en el atril y NO estaba ahí antes:
+  // típicamente al reparto inicial (14 de golpe) y cuando robas (1).
+  for (const id of idsActualesAtril) if (!_idsEnAtrilPrev.has(id)) _idsNuevasEnAtril.add(id);
+  _idsEnMesaPrev = idsActualesMesa;
+  _idsEnAtrilPrev = idsActualesAtril;
+  _contadorFlipDelay = 0;  // reset para el efecto escalonado del reparto
   mesaEl.innerHTML = "";
   mesaLocal.forEach((comb, idx) => {
     const c = document.createElement("div");

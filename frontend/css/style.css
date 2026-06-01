@@ -754,35 +754,48 @@ body.game {
   transform: scale(1.05);
 }
 
-/* Animación de flip al colocar una ficha en la mesa (estilo Rummikub oficial) */
+/* Animación de flip 360° — para fichas que aparecen en el ATRIL (reparto inicial
+   y robar), como "girarlas para verlas" en el Rummikub real. */
 @keyframes ficha-flip {
   0% {
-    transform: perspective(600px) rotateY(0deg) translateY(-20px) scale(0.85);
+    transform: perspective(600px) rotateY(0deg) scale(0.7);
     opacity: 0;
-    box-shadow: 0 12px 24px rgba(0,0,0,.5);
   }
-  25% {
-    transform: perspective(600px) rotateY(90deg) translateY(-10px) scale(0.95);
-    opacity: 0.6;
-  }
-  50% {
-    transform: perspective(600px) rotateY(180deg) translateY(-4px) scale(1.05);
-    opacity: 0.9;
-    box-shadow: 0 8px 18px rgba(0,0,0,.45);
-  }
-  75% {
-    transform: perspective(600px) rotateY(270deg) translateY(-2px) scale(1.03);
-    opacity: 0.95;
+  40% {
+    transform: perspective(600px) rotateY(180deg) scale(1.05);
+    opacity: 0.85;
   }
   100% {
-    transform: perspective(600px) rotateY(360deg) translateY(0) scale(1);
+    transform: perspective(600px) rotateY(360deg) scale(1);
+    opacity: 1;
+  }
+}
+.ficha.flip-in {
+  animation: ficha-flip 0.6s cubic-bezier(.2,.7,.2,1);
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+/* Animación de "drop" — para fichas que aparecen en la MESA. Sin giro,
+   solo un pop con escala + sombra que cae. Más sutil para no marear. */
+@keyframes ficha-drop {
+  0% {
+    transform: scale(0.6) translateY(-12px);
+    opacity: 0;
+    box-shadow: 0 10px 16px rgba(0,0,0,.4);
+  }
+  60% {
+    transform: scale(1.12) translateY(2px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
     opacity: 1;
     box-shadow: var(--tile-sombra);
   }
 }
-.ficha.flip-in {
-  animation: ficha-flip 0.55s cubic-bezier(.2,.7,.2,1);
-  transform-style: preserve-3d;
+.ficha.drop-in {
+  animation: ficha-drop 0.25s ease-out;
 }
 .ficha.negro { color: var(--negro); }
 .ficha.azul { color: var(--azul); text-shadow: var(--texto-shadow); }
