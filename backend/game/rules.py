@@ -73,6 +73,17 @@ def aplicar_jugada(
     if not fichas_bajadas:
         return ResultadoJugada(False, "Debes bajar al menos una ficha o robar")
 
+    # 4a. regla del comodín: si capturaste un comodín de la mesa,
+    #     debe terminar en una combinación nueva (no en el atril)
+    mesa_nueva_set = set(mesa_nueva_ids)
+    for tid in mesa_antigua_ids:
+        if estado.indice[tid].is_joker and tid not in mesa_nueva_set:
+            return ResultadoJugada(
+                False,
+                "Capturaste un comodín pero no lo reincorporaste a la mesa "
+                "(debe terminar en una combinación nueva)",
+            )
+
     # 5. salida inicial
     if not estado.ha_salido[jugador]:
         # las combinaciones que contienen fichas bajadas deben ser combinaciones
@@ -94,8 +105,36 @@ def aplicar_jugada(
             )
         estado.ha_salido[jugador] = True
 
-    # commit
-    estado.mesa = [list(c) for c in nueva_mesa]
+    # commit (ordenado)
+    def _sort_comb(ids: list[str]) -> list[str]:
+        tiles = [estado.indice[i] for i in ids]
+        reales = sorted([t for t in tiles if not t.is_joker], key=lambda t: t.number)
+        jokers = [t for t in tiles if t.is_joker]
+        if not reales:
+            return [t.id for t in jokers]
+        colores = {t.color for t in reales}
+        if len(colores) == 1 and len(reales) >= 2:
+            # wrap_13_to_1: si la regla está activa, hay 13, hay 1 y no hay 2 → el 1 va al final
+            nums_r = [t.number for t in reales]
+            if estado.reglas.get("wrap_13_to_1") and 13 in nums_r and 1 in nums_r and 2 not in nums_r:
+                ficha1 = next(t for t in reales if t.number == 1)
+                reales = [t for t in reales if t.number != 1] + [ficha1]
+            res, j = [], 0
+            for i, t in enumerate(reales):
+                res.append(t)
+                if i < len(reales) - 1:
+                    gap = reales[i + 1].number - t.number - 1
+                    while gap > 0 and j < len(jokers):
+                        res.append(jokers[j])
+                        j += 1
+                        gap -= 1
+            while j < len(jokers):
+                res.append(jokers[j])
+                j += 1
+            return [t.id for t in res]
+        return [t.id for t in reales + jokers]
+
+    estado.mesa = [_sort_comb(c) for c in nueva_mesa]
     estado.atriles[jugador] = list(atril_nuevo_ids)
 
     if not estado.atriles[jugador]:

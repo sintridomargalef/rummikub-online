@@ -910,6 +910,14 @@ function autoOrdenarSiEsEscalera(idx) {
   // ordenar reales ascendente, intercalar jokers ocupando los huecos
   const ordenReales = reales.slice().sort((a, b) => a.number - b.number);
   const jokers = comb.filter((t) => t.is_joker);
+  // wrap_13_to_1: si la regla está activa y hay 13 y hay 1 y no hay 2 → el 1 va al final
+  const reglas = (snapshotServidor && snapshotServidor.reglas) || {};
+  const numsCheck = ordenReales.map((t) => t.number);
+  if (reglas.wrap_13_to_1 && numsCheck.includes(13) && numsCheck.includes(1) && !numsCheck.includes(2)) {
+    const i1 = ordenReales.findIndex((t) => t.number === 1);
+    const ficha1 = ordenReales.splice(i1, 1)[0];
+    ordenReales.push(ficha1);
+  }
   // Si jokers ocupan los huecos entre números
   const nums = ordenReales.map((t) => t.number);
   const resultado = [];
