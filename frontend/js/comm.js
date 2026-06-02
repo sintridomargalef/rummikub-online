@@ -193,6 +193,15 @@
   }
 
   async function activarCamara() {
+    // Diagnóstico previo
+    if (!navigator.mediaDevices) {
+      mostrarToastLocal("❌ Cámara no disponible: la página necesita HTTPS con certificado aceptado. Abre https://192.168.1.35:8443 en una pestaña nueva, acepta el aviso de seguridad y vuelve a intentarlo.");
+      return;
+    }
+    if (typeof navigator.mediaDevices.getUserMedia !== "function") {
+      mostrarToastLocal("❌ Tu navegador no soporta acceso a cámara.");
+      return;
+    }
     try {
       abrirPanel();
       await obtenerLocalStream(true, micOn);
@@ -200,7 +209,7 @@
       crearPC();
       vincularTracks(); // dispara onnegotiationneeded
     } catch (e) {
-      mostrarToastLocal("No se pudo acceder a la cámara: " + e.message);
+      mostrarToastLocal("❌ Cámara: " + e.name + " — " + e.message);
       camOn = false;
     }
     actualizarBotonesAV();
