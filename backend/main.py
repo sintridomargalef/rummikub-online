@@ -269,12 +269,14 @@ async def ws_juego(websocket: WebSocket, codigo: str, nombre: str):
         await websocket.close()
         return
 
-    # registrar jugador
-    if nombre in sala.sockets:
-        # ya conectado bajo ese nombre — rechazar duplicado
-        await websocket.send_json({"type": "error", "msg": "Ese nombre ya está conectado"})
-        await websocket.close()
-        return
+    # registrar jugador — si ya hay un socket con ese nombre, cerrarlo y reemplazarlo
+    # (esto cubre reconexiones tras caída de red sin rechazar al jugador)
+    if nombre in sala.sockets and sala.sockets[nombre] is not None:
+        try:
+            await sala.sockets[nombre].close(code=1001)
+        except Exception:
+            pass
+        sala.sockets.pop(nombre, None)
 
     es_jugador_nuevo = nombre not in sala.jugadores
 
