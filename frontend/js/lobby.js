@@ -79,6 +79,55 @@ if (joinParam) {
   setMsg(`Te uniras a la sala ${joinParam.toUpperCase()}. Pon tu nombre y pulsa "Unirme".`, "ok");
 }
 
+// ====== Persistencia de preferencias en localStorage ======
+const PREFS_KEY = "rk_prefs";
+
+function guardarPrefs() {
+  try {
+    const prefs = {
+      nombre: $("nombre").value.trim(),
+      wrap_13_to_1: $("regla-wrap_13_to_1").checked,
+      tiempo_total: $("tiempo-total").value,
+      tiempo_turno: $("tiempo-turno").value,
+      juego_extremo: $("regla-juego-extremo").checked,
+      contra_ia: $("regla-contra-ia").checked,
+    };
+    // ver-directo solo si existe el elemento
+    const verDirecto = $("regla-ver-directo");
+    if (verDirecto) prefs.ver_jugada_directo = verDirecto.checked;
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch (_) {}
+}
+
+function cargarPrefs() {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (p.nombre)        $("nombre").value = p.nombre;
+    if (p.wrap_13_to_1 != null) $("regla-wrap_13_to_1").checked = p.wrap_13_to_1;
+    if (p.tiempo_total  != null) $("tiempo-total").value = p.tiempo_total;
+    if (p.tiempo_turno  != null) $("tiempo-turno").value = p.tiempo_turno;
+    if (p.juego_extremo != null) $("regla-juego-extremo").checked = p.juego_extremo;
+    if (p.contra_ia     != null) $("regla-contra-ia").checked = p.contra_ia;
+    const verDirecto = $("regla-ver-directo");
+    if (verDirecto && p.ver_jugada_directo != null) verDirecto.checked = p.ver_jugada_directo;
+    // Sincronizar el select de tiempo_turno si juego_extremo está activo
+    if (p.juego_extremo) $("tiempo-turno").disabled = true;
+  } catch (_) {}
+}
+
+// Cargar al entrar
+cargarPrefs();
+
+// Guardar en cada cambio de cualquier campo
+["nombre","regla-wrap_13_to_1","tiempo-total","tiempo-turno","regla-juego-extremo","regla-contra-ia","regla-ver-directo"].forEach((id) => {
+  const el = $(id);
+  if (!el) return;
+  el.addEventListener("change", guardarPrefs);
+  el.addEventListener("input",  guardarPrefs);
+});
+
 $("nombre").focus();
 
 // ====== Ranking ======
